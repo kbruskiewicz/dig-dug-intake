@@ -1,0 +1,18 @@
+{
+  "name": "dig-dug-intake",
+  "version": "1.0.0",
+  "description": "Manage files coming into HuGeAMP by downloading, annotating and transforming their contents, automatically.",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "mysql2": "^2.2.5",
+    "passport": "",
+    "sequelize": "^6.3.5",
+    "sqlite3": "^5.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}

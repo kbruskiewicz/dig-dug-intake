@@ -1,0 +1,9 @@
+# Don't observe any datasets (since they might be sensitive)
+*.csv
+*.tsv
+*.xlsx
+*.ods
+
+*.swp
+
+node_modules/
