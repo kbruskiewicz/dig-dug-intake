@@ -8,13 +8,17 @@
   },
   "dependencies": {
     "app-root-path": "^2.2.1",
+    "cookie-parser": "^1.4.5",
+    "crypto-js": "^4.0.0",
     "express": "^4.17.1",
+    "express-session": "^1.17.1",
     "js-yaml": "^3.13.1",
     "lodash.merge": "^4.6.2",
     "mysql2": "^2.2.5",
     "passport": "",
     "passport-local": "^1.0.0",
     "sequelize": "^6.3.5",
+    "sjcl": "^1.0.8",
     "sqlite3": "^5.0.0"
   },
   "author": "",
