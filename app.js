@@ -26,10 +26,8 @@ if (loadedConfig.db.host === 'sqlite::memory:') {
 
 class User extends Model {}
 User.init({
-    email: {
-      type: DataTypes.STRING,
-      defaultValue: '',
-    },
+
+    // authentication information
     username: {
         type: DataTypes.STRING,
         defaultValue: '',
@@ -46,10 +44,17 @@ User.init({
         type: DataTypes.STRING,
         defaultValue: ''
     },
+
+    // useful metadata
+    email: {
+        type: DataTypes.STRING,
+        defaultValue: '',
+      },
     role: {
         type: DataTypes.STRING,
         defaultValue: '',
     }
+
 }, { sequelize, modelName: 'user' })
 
 // convert passwords into cryptographically secure information
@@ -59,7 +64,7 @@ const shakeSalt = (
     buffer_size=10
 ) => {
     const buf = Buffer.alloc(buffer_size);
-    return crypto.randomFillSync(buf).toString('hex')
+    return crypto.randomFillSync(buf).toString('hex');
 }
 
 // use pbkdf2 (node implementation)
@@ -78,7 +83,7 @@ const validatePassword = (
 
 passport.use(new LocalStrategy(
     async function(username, password, done) {
-        console.log('attempting to authenticate with local strategy,', username, password);
+
         const user = await User.findOne({ 
             where: { username } 
         });
@@ -90,19 +95,15 @@ passport.use(new LocalStrategy(
                 return done(null, false, { message: 'Incorrect username.' });
             }
 
-            if (validatePassword(password, user.password_salt, user.hash_function)(user.password_hash)) {
-                console.log('password is valid', password, user.password_hash)
-                return done(null, user);
+            const userModel = user.dataValues;
+            if (validatePassword(password, userModel.password_salt, userModel.hash_function)(userModel.password_hash)) {
+                return done(null, userModel);
             } else {
-                console.log('password is not valid', password, user.password_hash)
                 return done(null, false, { message: 'Incorrect password.' });
             }
         }
-        
-        if (user !== null) {
-            console.log('found a match! authenticating...')
-            authenticate(null, user.dataValues)
-        }
+
+        authenticate(null, user);
     }
 ));
 
@@ -129,23 +130,26 @@ app.use(require('express-session')({
 app.use(passport.initialize());
 app.use(passport.session());
 
+
+async function registerUser(username, password, email, role, salt=shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation) {
+    const user = await User.create({
+        username: username,
+        password_salt: salt,
+        password_hash: obscurePassword(password, hash_function, salt),
+        hash_function: hash_function,
+        email,
+        role,
+    });
+    return user;
+}
+
 // initialize resources
 try {
     sequelize.sync().then(async () => {
         
-        const salt = shakeSalt();
-        const hash_function = loadedConfig.crypto.hash_implementation;
-        const password_hash = obscurePassword('janedoe', hash_function, salt)
-        console.log(password_hash)
-
-        const jane = await User.create({
-            username: 'janedoe',
-            password_salt: salt,
-            password_hash: obscurePassword('janedoe', hash_function, salt),
-            hash_function: hash_function
-        });
-
-        console.log(jane.toJSON());
+        // TODO: guarantee that user IDs are UUIDs
+        const jane = await registerUser('janedoe', 'janedoe');
+        console.log(jane.toJSON())
     
     }).then(() => {
     
