@@ -11,6 +11,20 @@ const flash = require("connect-flash");
 
 const loadedConfig = config.loadConfig();
 
+// TODO: HTTPS
+const app = express();
+// middleware
+app.use(require('cookie-parser')());
+app.use(require('body-parser').urlencoded({ extended: true }));
+app.use(require('express-session')({
+    secret: loadedConfig.session_key,
+    resave: true,
+    saveUninitialized: true
+}));
+app.use(flash());
+app.use(passport.initialize());
+app.use(passport.session());
+
 let sequelize = null;
 if (loadedConfig.db.host === 'sqlite::memory:') {
     sequelize = new Sequelize(loadedConfig.db.host, {
@@ -21,9 +35,9 @@ if (loadedConfig.db.host === 'sqlite::memory:') {
     sequelize = new Sequelize(database, username, password, {
         dialect,
         host,
+        logging: console.log
     })
 }
-
 
 // an enum class
 function initEnumClass(sequelize, SequelizeModel, modelName, prop='name') {
@@ -236,22 +250,6 @@ async function registerDataset(user_id, name, institution, principal_investigato
     }
 };
 
-
-const app = express();
-// middleware
-app.use(require('cookie-parser')());
-app.use(require('body-parser').urlencoded({ extended: true }));
-app.use(require('express-session')({
-    secret: loadedConfig.session_key,
-    resave: true,
-    saveUninitialized: true
-}));
-app.use(flash());
-app.use(passport.initialize());
-app.use(passport.session());
-
-
-
 // initialize resources
 try {
     sequelize.sync().then(async () => {
@@ -274,7 +272,7 @@ try {
 
         };
 
-        let context = {};
+        let context = {};  // e.g. call the databases for some state so that it can be used in functions below
         return context;
 
     }).then(context => {
@@ -324,11 +322,16 @@ try {
                 res.send(501)
             });
 
+            // DONE
+                // except... sending encrypted password over wire on clientside
             app.post('/do/user/register', async (req, res) => {
                 const { username, password, email, role } = req.body;
-                console.log(username, password, email, role)
                 const newUser = await registerUser(username, password, email, role);
-                res.send(newUser);
+                if (newUser) {
+                    return res.send(200)
+                } else {
+                    return res.send(304)
+                }
             });
 
             app.post('/do/datasets/register', async (req, res) => {
@@ -343,8 +346,22 @@ try {
                         datatype='',
                         // CHECK COMPLIANCE => if compliant, EMBARGO LIFT TIME IS NOW. If not, ask for the later EMBARGO DATE
                         embargo_date='' } = req.body;
-                        
-                return res.send(501)
+                const dataset = await registerDataset(
+                    user_id,
+                    accession_id,
+                    name,
+                    institution,
+                    principal_investigator,
+                    source,
+                    state,
+                    datatype,
+                    embargo_date,
+                )
+                if (dataset) {
+                    return res.send(200)
+                } else {
+                    return res.send(304)
+                }
             });
             
             // TODO: gets datasets => post or query params?
