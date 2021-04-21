@@ -6,5 +6,6 @@
 
 *.swp
 *.yml
+*lock.*
 
 node_modules/

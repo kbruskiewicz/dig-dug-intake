@@ -2,19 +2,16 @@
     <head>
         <meta charset="utf8">
         <link rel="stylesheet" href="index.css">
-        <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
         <script src="./node_modules/"></script>
     </head>
     <body>
-    
-        <div id="app"></div>
+        
+        <h3>Login</h3>
+        <p>
+            You will be asked to register if the account doesn't exist.
+        </p>
+        <form method="post" action="/do/user/login">
 
-        <form method="post" action="/login">
-
-            <h3>Login</h3>
-            <p>
-                You will be registered if the account doesn't exist.
-            </p>
             <label for="username">Username</label><br>
             <input id="username" name="username" type="text"/><br>
             <br>
@@ -32,7 +29,8 @@
             <input id="submit" type="submit" name="login" value="Login with Google"/>
         </form>
 
+        <!-- This part of the website should only appear when the user is logged in -->
+        <!--  -->
 
-        <script src="index.js"></script>
     </body>
 </html>
