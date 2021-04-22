@@ -7,6 +7,7 @@ const express = require("express");
 const crypto = require('crypto');
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
+const GoogleStrategy = require( 'passport-google-oauth20' ).Strategy;
 const flash = require("connect-flash");
 
 const loadedConfig = config.loadConfig();
@@ -75,7 +76,12 @@ User.init({
         // TODO: roles - how to generate them programatically? => reference another table => convert to FKEYS
         type: DataTypes.ENUM(''),
         defaultValue: '',
-    }
+    },
+    // useful metadata
+    // googleId: {
+    //     type: DataTypes.STRING,
+    //     defaultValue: '',
+    // },
 
 }, { sequelize, modelName: 'user' });
 UserRole.belongsTo(User);
@@ -129,6 +135,19 @@ passport.use(new LocalStrategy(
 
         authenticate(null, user);
     }
+));
+
+passport.use(new GoogleStrategy({
+    clientID: loadedConfig.auth.google.clientId,
+    clientSecret: loadedConfig.auth.google.secretId,
+    // callbackURL: `http://${loadedConfig.auth.google.callbackHost}`
+  },
+  function(accessToken, refreshToken, profile, cb) {
+        console.log(profile)
+        // User.findOrCreate({ googleId: profile.id }, function (err, user) {
+        //     return cb(err, user);
+        // });
+  }
 ));
 
 passport.serializeUser((user, done) => {
@@ -202,17 +221,17 @@ Dataset.init({
 
     source: {
         // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.ENUM(''),
+        type: DataTypes.STRING,
         defaultValue: '',
     },
     state: {
         // TODO: states - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.ENUM(''),
+        type: DataTypes.STRING,
         defaultValue: '',
     },
     datatype: {
         // TODO: states - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.ENUM(''),
+        type: DataTypes.STRING,
         defaultValue: '',
     },
 
@@ -220,34 +239,35 @@ Dataset.init({
 
 }, { sequelize, modelName: 'datasets' })
 
-DatasetState.belongsTo(Dataset); 
-DatasetSource.belongsTo(Dataset); 
-DatasetType.belongsTo(Dataset); 
+Dataset.hasOne(DatasetState);
+Dataset.hasOne(DatasetSource); 
+Dataset.hasOne(DatasetType);
 
-
-async function datasetExists(/*{ ...primaryKeyInformation }*/) {
-    // return !!(await Dataset.findOne({ where: { ...primaryKeyInformation } }));
-    return true;
+async function datasetExists(query) {
+    return !!(await Dataset.findOne({ where: query }));
 }
 
-async function registerDataset(user_id, name, institution, principal_investigator, source, state, datatype, embargo_date) {
-    if (!datasetExists(/* name? */)) {
-        const dataset = await Dataset.create({
-            user_id,
-            // accessions should either be generated here or within SQL
-            // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
-            name,
-            institution,
-            principal_investigator, 
-            source,
-            state,
-            datatype,
-            embargo_date,
-        });
-        return dataset;
-    } else {
-        return null;
-    }
+async function registerDataset(accession_id, user_id, name, institution, principal_investigator, source, state, datatype, embargo_date) {   
+    console.log('dataset does not exist')
+    const dataset = await Dataset.create({
+        accession_id,
+        user_id,
+        // accessions should either be generated here or within SQL
+        // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
+        name,
+        institution,
+        principal_investigator, 
+        source,
+        state,
+        datatype,
+        embargo_date,
+        state: 0,
+    });
+    return dataset;
+    // } else {
+    //     console.log('dataset exists')
+    //     return null;
+    // }
 };
 
 // initialize resources
@@ -280,6 +300,8 @@ try {
         if (sequelize !== null) {
             
             app.use('/', express.static('src/pages/'));
+            app.use('/modules', express.static('node_modules/'));
+
             // TODO: model page flow
             app.get('/register', (_, res) => res.redirect('/register.html'));
             app.get('/login', (_, res) => res.redirect('/index.html'));
@@ -306,21 +328,20 @@ try {
                         }
                         if (!user) { 
                             // TODO: populate form with defaults?
-                            return res.redirect('/register'); 
+                            return res.redirect('/register.html'); 
                         }
                         req.logIn(user, function(err) {
                             if (err) { 
                                 return next(err); 
                             }
-                            return res.redirect('/datasets/' + user.id);
+                            return res.redirect('/datasets.html?user=' + user.id);
                         });
                     })(req, res, next)
                 }
             );
+            
 
-            app.post('/do/user/login/google', function(req, res, next) {
-                res.send(501)
-            });
+            app.post('/do/user/login/google', passport.authenticate('google', { scope: ['profile'] }));
 
             // DONE
                 // except... sending encrypted password over wire on clientside
@@ -335,20 +356,23 @@ try {
             });
 
             app.post('/do/datasets/register', async (req, res) => {
-
-                const { user_id='',
-                        accession_id='',
-                        name='',
-                        institution='',
-                        principal_investigator='',
-                        source='',
-                        state='',
-                        datatype='',
-                        // CHECK COMPLIANCE => if compliant, EMBARGO LIFT TIME IS NOW. If not, ask for the later EMBARGO DATE
-                        embargo_date='' } = req.body;
-                const dataset = await registerDataset(
+                console.log(req.body)
+                const accession_id = shakeSalt(10);
+                const { 
                     user_id,
+                    provider,
+                    name,
+                    institution,
+                    principal_investigator,
+                    source,
+                    state,
+                    datatype,
+                    // CHECK COMPLIANCE => if compliant, EMBARGO LIFT TIME IS NOW. If not, ask for the later EMBARGO DATE
+                    embargo_date 
+                } = req.body;
+                const dataset = await registerDataset(
                     accession_id,
+                    user_id,
                     name,
                     institution,
                     principal_investigator,
@@ -356,16 +380,19 @@ try {
                     state,
                     datatype,
                     embargo_date,
-                )
+                );
                 if (dataset) {
-                    return res.send(200)
+                    return res.send(dataset)
                 } else {
-                    return res.send(304)
+                    return res.send(500);
                 }
+   
             });
             
             // TODO: gets datasets => post or query params?
             app.get('/datasets/:userId', async (req, res) => {
+                // TODO: check if logged in user === userId!
+                // else unless the role is admin or the dataset is public, don't show
                 const datasets = await Dataset.findAll({ where: { user_id: req.params.userId }});
                 if (datasets) {
                     res.send(datasets)
@@ -407,6 +434,19 @@ try {
                 res.setHeader('Content-Type', 'application/json');
                 res.send(JSON.stringify(results));
             });
+
+            app.get('/users/:userId/username', async (req, res) => {
+                const results = await User.findOne({
+                   where: { id: req.params.userId }
+                })
+                if (results) {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.send(JSON.stringify(results.dataValues.username));    
+                } else {
+                    res.send({});
+                }
+            });
+
             app.get('/users/roles/', async (req, res) => {
                 const results = await UserRole.findAll();
                 res.setHeader('Content-Type', 'application/json');
