@@ -42,7 +42,7 @@ if (loadedConfig.db.host === 'sqlite::memory:') {
 
 // an enum class
 function initEnumClass(sequelize, SequelizeModel, modelName, prop='name') {
-    SequelizeModel.init({ [prop]: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName })
+    SequelizeModel.init({ [prop]: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName, timestamps: false })
 }
 
 class UserRole extends Model {};
@@ -239,10 +239,6 @@ Dataset.init({
 
 }, { sequelize, modelName: 'datasets' })
 
-Dataset.hasOne(DatasetState);
-Dataset.hasOne(DatasetSource); 
-Dataset.hasOne(DatasetType);
-
 async function datasetExists(query) {
     return !!(await Dataset.findOne({ where: query }));
 }
@@ -292,6 +288,16 @@ try {
 
         };
 
+        // await DatasetState.create({
+        //     state: 'test'
+        // })
+        // await DatasetSource.create({
+        //     source: 'test'
+        // })
+        // await DatasetType.create({
+        //     type: 'test'
+        // })
+
         let context = {};  // e.g. call the databases for some state so that it can be used in functions below
         return context;
 
@@ -328,6 +334,9 @@ try {
                         }
                         if (!user) { 
                             // TODO: populate form with defaults?
+                                // conditional redirect:
+                                    // username exists => password is wrong
+                                    // username does not exist => register (or prompt register)
                             return res.redirect('/register.html'); 
                         }
                         req.logIn(user, function(err) {
@@ -419,20 +428,31 @@ try {
             });
 
             // enum endpoints
-            app.get('/datasets/states/', async (req, res) => {
-                const results = await DatasetState.findAll();
-                res.setHeader('Content-Type', 'application/json');
-                res.send(JSON.stringify(results));
+            app.get('/do/query/datasets/states', async (req, res) => {
+                const results = await DatasetState.findAll({ raw: true });
+                if (results) {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.send(results);
+                } else {
+                    res.send(404)
+                }
+
             });
-            app.get('/datasets/datatypes/', async (req, res) => {
-                const results = await DatasetType.findAll();
-                res.setHeader('Content-Type', 'application/json');
-                res.send(JSON.stringify(results));
+            app.get('/do/query/datasets/datatypes', async (req, res) => {
+                const results = await DatasetType.findAll({ raw: true });
+                if (results) {
+                    res.send(results);
+                } else {
+                    res.send(404)
+                }
             });
-            app.get('/datasets/sources/', async (req, res) => {
-                const results = await DatasetSource.findAll();
-                res.setHeader('Content-Type', 'application/json');
-                res.send(JSON.stringify(results));
+            app.get('/do/query/datasets/sources', async (req, res) => {
+                const results = await DatasetSource.findAll({ raw: true });
+                if (results) {
+                    res.send(results);
+                } else {
+                    res.send(404)
+                }
             });
 
             app.get('/users/:userId/username', async (req, res) => {
@@ -440,7 +460,6 @@ try {
                    where: { id: req.params.userId }
                 })
                 if (results) {
-                    res.setHeader('Content-Type', 'application/json');
                     res.send(JSON.stringify(results.dataValues.username));    
                 } else {
                     res.send({});
