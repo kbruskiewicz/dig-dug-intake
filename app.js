@@ -122,14 +122,14 @@ passport.use(new LocalStrategy(
             if (err) { return done(err); }
             
             if (!user) {
-                return done(null, false, { message: 'Incorrect username.' });
+                return done('nouser', false, { message: 'Incorrect username.' });
             }
 
             const userModel = user.dataValues;
             if (validatePassword(password, userModel.password_salt, userModel.hash_function)(userModel.password_hash)) {
                 return done(null, userModel);
             } else {
-                return done(null, false, { message: 'Incorrect password.' });
+                return done('nopassword', false, { message: 'Incorrect password.' });
             }
         }
 
@@ -160,8 +160,6 @@ passport.deserializeUser(async (id, done) => {
     });    
     done(null, user);
 });
-
-
 
 async function userExists(username) {
     return await User.findOne({ where: { username } })
@@ -200,6 +198,7 @@ initEnumClass(sequelize, DatasetType, 'dataset_type', 'type');
 
 class Dataset extends Model {}
 Dataset.init({
+    // database mechanics
     user_id: DataTypes.STRING,
     accession_id: {
         type: DataTypes.STRING,
@@ -214,11 +213,19 @@ Dataset.init({
         type: DataTypes.STRING,
         defaultValue: '',
     },
+    provider: {
+        type: DataTypes.STRING,
+        defaultValue: '',
+    },
     principal_investigator: {
         type: DataTypes.STRING,
         defaultValue: '',
     },
-
+    description: {
+        type: DataTypes.TEXT,
+        defaultValue: ''
+    },
+    
     source: {
         // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
         type: DataTypes.STRING,
@@ -243,8 +250,7 @@ async function datasetExists(query) {
     return !!(await Dataset.findOne({ where: query }));
 }
 
-async function registerDataset(accession_id, user_id, name, institution, principal_investigator, source, state, datatype, embargo_date) {   
-    console.log('dataset does not exist')
+async function registerDataset({accession_id, user_id, name, institution, description, provider, principal_investigator, source, state, datatype, embargo_date}) {   
     const dataset = await Dataset.create({
         accession_id,
         user_id,
@@ -253,6 +259,7 @@ async function registerDataset(accession_id, user_id, name, institution, princip
         name,
         institution,
         principal_investigator, 
+        description, provider, 
         source,
         state,
         datatype,
@@ -288,16 +295,6 @@ try {
 
         };
 
-        // await DatasetState.create({
-        //     state: 'test'
-        // })
-        // await DatasetSource.create({
-        //     source: 'test'
-        // })
-        // await DatasetType.create({
-        //     type: 'test'
-        // })
-
         let context = {};  // e.g. call the databases for some state so that it can be used in functions below
         return context;
 
@@ -321,7 +318,7 @@ try {
             })
 
             app.get('/test/fail', (req, res) => {
-                console.log('error')
+                console.error('error')
                 res.send(500)
             })
             // the controllers are defined in the 'initialize controllers' function.
@@ -329,15 +326,22 @@ try {
     
             app.post('/do/user/login', function(req, res, next) {
                     passport.authenticate('local', function(err, user, info) {
-                        if (err) {  
-                            return next(err);   
-                        }
-                        if (!user) { 
-                            // TODO: populate form with defaults?
+                        if (err || !user) {  
+                            // TODO: refactor to enum
+                            if (err === 'nouser') {
+                                // TODO: populate form with defaults?
                                 // conditional redirect:
-                                    // username exists => password is wrong
-                                    // username does not exist => register (or prompt register)
-                            return res.redirect('/register.html'); 
+                                // username exists => password is wrong
+                                // username does not exist => register (or prompt register)
+                                return res.redirect('/register.html');
+                            } else if (err === 'nopassword') {
+                                // TODO: populate form with defaults?
+                                // conditional redirect:
+                                // username exists => password is wrong
+                                // username does not exist => register (or prompt register)
+                                return res.redirect('/index.html');
+                            }
+                            return next(err)
                         }
                         req.logIn(user, function(err) {
                             if (err) { 
@@ -367,29 +371,7 @@ try {
             app.post('/do/datasets/register', async (req, res) => {
                 console.log(req.body)
                 const accession_id = shakeSalt(10);
-                const { 
-                    user_id,
-                    provider,
-                    name,
-                    institution,
-                    principal_investigator,
-                    source,
-                    state,
-                    datatype,
-                    // CHECK COMPLIANCE => if compliant, EMBARGO LIFT TIME IS NOW. If not, ask for the later EMBARGO DATE
-                    embargo_date 
-                } = req.body;
-                const dataset = await registerDataset(
-                    accession_id,
-                    user_id,
-                    name,
-                    institution,
-                    principal_investigator,
-                    source,
-                    state,
-                    datatype,
-                    embargo_date,
-                );
+                const dataset = await registerDataset({ accession_id, ...req.body });
                 if (dataset) {
                     return res.send(dataset)
                 } else {
