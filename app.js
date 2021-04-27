@@ -50,7 +50,6 @@ initEnumClass(sequelize, UserRole, 'user_role', 'role');
 
 class User extends Model {}
 User.init({
-    
     // authentication information
     username: {
         type: DataTypes.STRING,
@@ -65,6 +64,10 @@ User.init({
         type: DataTypes.STRING,
     },
 
+    //
+    name: {
+        type: DataTypes.STRING,
+    },
     // useful metadata
     email: {
         type: DataTypes.STRING,
@@ -165,12 +168,13 @@ async function userExists(username) {
     return await User.findOne({ where: { username } })
 }
 
-async function registerUser(username, password, email, role, salt=shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation) {
+async function registerUser(username, password, name, email, role, salt=shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation) {
     // TODO: guarantee that user IDs are UUIDs
     // should be generated in SQL
     if (!(await userExists(username))) {
         const user = await User.create({
             username: username,
+            name: name,
             password_salt: salt,
             password_hash: obscurePassword(password, hash_function, salt),
             hash_function: hash_function,
@@ -246,31 +250,30 @@ Dataset.init({
 
 }, { sequelize, modelName: 'datasets' })
 
-async function datasetExists(query) {
-    return !!(await Dataset.findOne({ where: query }));
-}
 
-async function registerDataset({accession_id, user_id, name, institution, description, provider, principal_investigator, source, state, datatype, embargo_date}) {   
-    const dataset = await Dataset.create({
-        accession_id,
-        user_id,
-        // accessions should either be generated here or within SQL
-        // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
-        name,
-        institution,
-        principal_investigator, 
-        description, provider, 
-        source,
-        state,
-        datatype,
-        embargo_date,
-        state: 0,
-    });
-    return dataset;
-    // } else {
-    //     console.log('dataset exists')
-    //     return null;
-    // }
+async function registerDataset({ accession_id, user_id, name, institution, description, provider, principal_investigator, source, state, datatype, embargo_date }) {   
+    const datasetExists = await Dataset.findOne({ where: { accession_id } }) !== null;
+    if (!datasetExists) {
+        const dataset = await Dataset.create({
+            accession_id,
+            user_id,
+            // accessions should either be generated here or within SQL
+            // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
+            name,
+            institution,
+            principal_investigator, 
+            description, provider, 
+            source,
+            state,
+            datatype,
+            embargo_date,
+            state: 0,
+        });
+        return dataset;
+    } else {
+        console.log('dataset exists')
+        return null;
+    }
 };
 
 // initialize resources
@@ -279,10 +282,11 @@ try {
         
         const username = loadedConfig.test.username;
         const password = loadedConfig.test.password;
+        const name = loadedConfig.test.name;
 
         if (!!username && !!password) {
             
-            let test_user = await registerUser(username, password);
+            let test_user = await registerUser(username, password, name);
             if (test_user) {
                 console.log(test_user.toJSON())
             } else {
@@ -305,7 +309,7 @@ try {
             app.use('/', express.static('src/pages/'));
             app.use('/modules', express.static('node_modules/'));
 
-            // TODO: model page flow
+            // TODO: model page flow with state machine
             app.get('/register', (_, res) => res.redirect('/register.html'));
             app.get('/login', (_, res) => res.redirect('/index.html'));
             app.get('/datasets', (_, res) => res.redirect('/datasets.html'));
@@ -325,6 +329,7 @@ try {
             // initializeControllers(app);
     
             app.post('/do/user/login', function(req, res, next) {
+                    console.log('login req body', req.body)
                     passport.authenticate('local', function(err, user, info) {
                         if (err || !user) {  
                             // TODO: refactor to enum
@@ -360,7 +365,7 @@ try {
                 // except... sending encrypted password over wire on clientside
             app.post('/do/user/register', async (req, res) => {
                 const { username, password, email, role } = req.body;
-                const newUser = await registerUser(username, password, email, role);
+                const newUser = await registerUser(username, password, name, email, role);
                 if (newUser) {
                     return res.send(200)
                 } else {
@@ -369,7 +374,6 @@ try {
             });
 
             app.post('/do/datasets/register', async (req, res) => {
-                console.log(req.body)
                 const accession_id = shakeSalt(10);
                 const dataset = await registerDataset({ accession_id, ...req.body });
                 if (dataset) {
@@ -447,6 +451,18 @@ try {
                     res.send({});
                 }
             });
+
+            app.get('/users/:userId/name', async (req, res) => {
+                const results = await User.findOne({
+                   where: { id: req.params.userId }
+                })
+                if (results) {
+                    res.send(JSON.stringify(results.dataValues.name));    
+                } else {
+                    res.send({});
+                }
+            });
+
 
             app.get('/users/roles/', async (req, res) => {
                 const results = await UserRole.findAll();

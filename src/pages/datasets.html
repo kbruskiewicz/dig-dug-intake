@@ -92,6 +92,7 @@
                 const row = document.createElement('tr');
                 Object.entries(arrayOfStructs[index]).forEach(entry => {
                     const col = document.createElement('td');
+                    col.classList.add(entry[0]);
                     col.appendChild(document.createTextNode(entry[1]));
                     row.appendChild(col);
                 })
@@ -99,6 +100,30 @@
             }
 
             document.querySelector(unique_element).appendChild(table)
+        }
+
+        function renderColumns() {
+            // get all rows in table
+            // get all columns in row
+            // get name for each column
+            // apply switch case for content
+            
+            let element = '';
+            let classname = '';
+            switch (classname) {
+                case 'id': break;
+                case 'user_id': break;
+                case 'name': break;
+                case 'accession_id': break;
+                case 'institution': break;
+                case 'provider': break;
+                case 'principal_investigator': break;
+                case 'source': break;
+                case 'state': break;
+                case 'datatype': break;
+                case 'embargo_date': break;
+                case 'description': break;
+            }
         }
 
         function selectify(arrayOfValues, target, name, unique_element) {
@@ -116,6 +141,7 @@
 
         function displayDatasets(datasets) {
             tableify(datasets, '#show-datasets-table')
+
         };
         function displayUsers(username) {
             document.getElementById('provider').value = username;
@@ -139,7 +165,7 @@
                 .catch(console.warn);
 
             // TODO: draw out from session?!? Is this insecure?
-            const username = fetch(`/users/${user_id}/username`)
+            const username = fetch(`/users/${user_id}/name`)
                 .then(b => b.json())
                 .then(displayUsers)
                 .catch(console.warn);

@@ -2,4 +2,8 @@
 
 ## Authentication
 
-## Registration
+## Account Registration
+
+## Dataset Browsing
+
+## Dataset Registrion
