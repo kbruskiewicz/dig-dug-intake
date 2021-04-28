@@ -68,84 +68,6 @@
 
         const url =  new URL(window.location.href);
         const user_id = url.searchParams.get("user");
-
-        function tableify(arrayOfStructs, unique_element) {
-            let fields = new Set();
-            for (index in arrayOfStructs) {
-                Object.keys(arrayOfStructs[index]).forEach(el => fields.add(el));
-            }
-
-            const table = document.createElement('table');
-            const tableBody = document.createElement('tbody');
-
-            table.appendChild(tableBody);
-
-            const header = document.createElement('tr');
-            fields.forEach(field => {
-                const col = document.createElement('td');
-                col.appendChild(document.createTextNode(field));
-                header.appendChild(col);
-            })
-            tableBody.appendChild(header);
-
-            for (index in arrayOfStructs) {
-                const row = document.createElement('tr');
-                Object.entries(arrayOfStructs[index]).forEach(entry => {
-                    const col = document.createElement('td');
-                    col.classList.add(entry[0]);
-                    col.appendChild(document.createTextNode(entry[1]));
-                    row.appendChild(col);
-                })
-                tableBody.appendChild(row);
-            }
-
-            document.querySelector(unique_element).appendChild(table)
-        }
-
-        function renderColumns() {
-            // get all rows in table
-            // get all columns in row
-            // get name for each column
-            // apply switch case for content
-            
-            let element = '';
-            let classname = '';
-            switch (classname) {
-                case 'id': break;
-                case 'user_id': break;
-                case 'name': break;
-                case 'accession_id': break;
-                case 'institution': break;
-                case 'provider': break;
-                case 'principal_investigator': break;
-                case 'source': break;
-                case 'state': break;
-                case 'datatype': break;
-                case 'embargo_date': break;
-                case 'description': break;
-            }
-        }
-
-        function selectify(arrayOfValues, target, name, unique_element) {
-            const select = document.createElement('select');
-            select.name = name;
-            arrayOfValues.forEach(optionValue => {
-                console.log(optionValue)
-                const option = document.createElement('option');
-                option.value = optionValue.id;
-                option.appendChild(document.createTextNode(optionValue[target]));
-                select.appendChild(option);
-            });
-            document.querySelector(unique_element).appendChild(select);
-        }
-
-        function displayDatasets(datasets) {
-            tableify(datasets, '#show-datasets-table')
-
-        };
-        function displayUsers(username) {
-            document.getElementById('provider').value = username;
-        }
         
         if (user_id) {
 
@@ -160,38 +82,171 @@
             document.getElementById('embargo_date').value = new Date().toDateInputValue();
 
             const json = fetch(`/datasets/${user_id}`)
-                .then(b => b.json())
-                .then(displayDatasets)
                 .catch(console.warn);
 
             // TODO: draw out from session?!? Is this insecure?
             const username = fetch(`/users/${user_id}/name`)
-                .then(b => b.json())
-                .then(displayUsers)
                 .catch(console.warn);
 
            const possible_sources = fetch(`/do/query/datasets/sources`)
-                .then(b => b.json())
-                .then(sources => selectify(
-                        sources,
-                        'source',
-                        'source', 
-                        '#source'
-                    )
-                )
                 .catch(console.warn);    
             
-           const possible_types = fetch(`/do/query/datasets/datatypes`)
-                .then(b => b.json())
-                .then(types => selectify(
-                        types,
-                        'type', 
-                        'datatype', 
-                        '#datatype'
-                    )
-                )
+            const possible_types = fetch(`/do/query/datasets/datatypes`)
                 .catch(console.warn);    
-            
+
+            Promise.all([
+                json.then(r => r.json()).then(j => ['datasets', j]), 
+                username.then(r => r.json()).then(j => ['username', j]), 
+                possible_sources.then(r => r.json()).then(j => ['sources', j]), 
+                possible_types.then(r => r.json()).then(j => ['datatypes', j])
+            ]).then(results => {
+                const context = Object.fromEntries(results);
+
+                function tableify(arrayOfStructs, unique_element, name) {
+                    let fields = new Set();
+                    for (index in arrayOfStructs) {
+                        Object.keys(arrayOfStructs[index]).forEach(el => fields.add(el));
+                    }
+
+                    const table = document.createElement('table');
+                    table.setAttribute('name', name);
+
+                    const tableBody = document.createElement('tbody');
+
+                    table.appendChild(tableBody);
+
+                    const header = document.createElement('tr');
+                    fields.forEach(field => {
+                        const col = document.createElement('th');
+                        col.appendChild(document.createTextNode(field));
+                        header.appendChild(col);
+                    })
+                    tableBody.appendChild(header);
+
+                    for (index in arrayOfStructs) {
+                        const row = document.createElement('tr');
+                        Object.entries(arrayOfStructs[index]).forEach(entry => {
+                            const col = document.createElement('td');
+                            col.classList.add(entry[0]); // annotate column with the property (in a class) so it can be handled as a group with that property
+                            col.appendChild(document.createTextNode(entry[1]));
+                            row.appendChild(col);
+                        })
+                        tableBody.appendChild(row);
+                    }
+
+                    document.querySelector(unique_element).appendChild(table)
+                }
+                function setContent(dom_node, func) {
+                    dom_node.textContent = func(dom_node.textContent)
+                }
+                function offOneself(dom_node, func) {
+                    dom_node.textContent = func(dom_node.textContent)
+                }
+                function renderColumns(table_accessor) {
+                    // get table
+                    const table = document.querySelector(table_accessor);
+                    if (table.tagName === 'TABLE') {
+                        // get all rows in table
+                        const rows = Array.from(table.getElementsByTagName('tr'));
+                        // get all columns in row
+                        rows.forEach(row => {
+                            const columns = Array.from(row.getElementsByTagName('td'));
+                            if (columns.length > 0) {
+                                columns.forEach(column => {
+                                    const classname = column.classList[0];
+                                    console.log(classname, column)
+                                    switch (classname) {
+                                        case 'id': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'user_id': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'name': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'accession_id': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'institution': 
+                                            setContent(column, text => text);
+                                            break;
+                                        case 'provider': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'principal_investigator': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'description': 
+                                            setContent(column, id => id); 
+                                            break;
+
+                                        case 'source': 
+                                            setContent(column, text => {
+                                                // loosey equivalence: ('1' == 1) === true
+                                                let source = context.sources.filter(el => el.id == text)[0]
+                                                return source.source;
+                                            }); ; 
+                                            break;
+                                        case 'state': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'datatype': 
+                                            setContent(column, text => {
+                                                // loosey equivalence: ('1' == 1) === true
+                                                let datatype = context.datatypes.filter(el => el.id == text)[0]
+                                                return datatype.type;
+                                            }); 
+                                            break;
+                                        case 'embargo_date': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'updatedAt': 
+                                            setContent(column, text => text); 
+                                            break;
+                                        case 'createdAt': 
+                                            setContent(column, text => text); 
+                                            break;
+        
+                                    }
+                                })
+                            }
+                        })
+                    } else {
+                        console.warn('the node you selected is not a table');
+                    }
+                }
+                function selectify(arrayOfValues, target, name, unique_element) {
+                    const select = document.createElement('select');
+                    select.name = name;
+                    arrayOfValues.forEach(optionValue => {
+                        console.log(optionValue)
+                        const option = document.createElement('option');
+                        option.value = optionValue.id;
+                        option.appendChild(document.createTextNode(optionValue[target]));
+                        select.appendChild(option);
+                    });
+                    document.querySelector(unique_element).appendChild(select);
+                }
+
+                function displayDatasets(datasets) {
+                    tableify(datasets, '#show-datasets-table', 'show-datasets-table')
+                    renderColumns('[name="show-datasets-table"]')
+
+                };
+
+                function displayUsers(username) {
+                    document.getElementById('provider').value = username;
+                }
+
+
+                displayDatasets(context.datasets);
+                displayUsers(context.username);
+                selectify(context.sources, 'source', 'source', '#source');
+                selectify(context.datatypes, 'type', 'datatype', '#datatype');
+
+            })
+    
         } else {
             console.warn('No user_id given on the datasets page!')
         }
