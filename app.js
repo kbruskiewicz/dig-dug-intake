@@ -66,11 +66,10 @@ User.init({
         type: DataTypes.STRING,
     },
 
-    //
+    // useful metadata
     name: {
         type: DataTypes.STRING,
     },
-    // useful metadata
     email: {
         type: DataTypes.STRING,
         validate: {
@@ -82,6 +81,7 @@ User.init({
         type: DataTypes.ENUM(''),
         defaultValue: '',
     },
+
     // useful metadata
     // googleId: {
     //     type: DataTypes.STRING,
