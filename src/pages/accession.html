@@ -1,0 +1,43 @@
+<html>
+    <head>
+        <meta charset="utf8">
+        <link rel="stylesheet" href="index.css">
+        <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+        <script src="/modules/"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@exampledev/new.css@1/new.min.css">
+        <link rel="stylesheet" href="https://fonts.xz.style/serve/inter.css">
+    </head>
+
+    <body>
+        <section id="main">
+            <h2>You have registered a dataset.</h2>
+            <h3>The accession number is <span id="accession" style="text-decoration: underline;"></span></h3>
+            <br><p>
+                Let's upload some files.
+            </p>
+            <p>
+                Since your dataset type is _____, you can upload [only single]/[multiple] files.
+            </p>
+            <div>
+                <form>
+                    <!-- TODO: restrict accepted file types -->
+                    <input type="file" id="files" name="filename" multiple="true"><br>
+                    <input type="submit" value="Upload Files"/>
+                </form>
+            </div>
+            <p>
+                You can always upload files later, or register more datasets.
+            </p>
+            <a href="/datasets.html">
+                Go back to datasets page
+            </a>
+        </section>
+    </body>
+
+    <script>
+        const url =  new URL(window.location.href);
+        const accession_id = url.searchParams.get("accession_id");
+        document.getElementById("accession").textContent = accession_id;
+    </script>
+
+</html>

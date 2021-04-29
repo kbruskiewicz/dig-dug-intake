@@ -9,3 +9,5 @@
 *lock.*
 
 node_modules/
+
+*.code-workspace

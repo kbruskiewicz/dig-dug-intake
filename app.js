@@ -281,24 +281,28 @@ async function registerDataset({ accession_id, user_id, name, institution, descr
 // initialize resources
 try {
     sequelize.sync()
+    .then(() => {
+        let context = {};
+        return context;
+    })
     .then(async () => {
         // Generate test SMTP service account from ethereal.email
         // Only needed if you don't have a real mail account for testing
         let testAccount = await nodemailer.createTestAccount();
 
         // create reusable transporter object using the default SMTP transport
-        let transporter = nodemailer.createTransport({
+        let mail_transporter = nodemailer.createTransport({
             host: "smtp.ethereal.email",
             port: 587,
             secure: false, // true for 465, false for other ports
             auth: {
-            user: testAccount.user, // generated ethereal user
-            pass: testAccount.pass, // generated ethereal password
+                user: testAccount.user, // generated ethereal user
+                pass: testAccount.pass, // generated ethereal password
             },
         });
 
         // send mail with defined transport object
-        let info = await transporter.sendMail({
+        let info = await mail_transporter.sendMail({
             from: '"Fred Foo 👻" <foo@example.com>', // sender address
             to: "bar@example.com, baz@example.com", // list of receivers
             subject: "Hello ✔", // Subject line
@@ -312,8 +316,11 @@ try {
         // Preview only available when sending through an Ethereal account
         console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
         // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
+
+        // let context = Object.assign(context, { mail_transporter });
+        // return context;
     })
-    .then(async () => {
+    .then(async context => {
         
         const username = loadedConfig.test.username;
         const password = loadedConfig.test.password;
@@ -334,10 +341,9 @@ try {
 
         };
 
-        let context = {};  // e.g. call the databases for some state so that it can be used in functions below
         return context;
 
-    }).then(context => {
+    }).then(async context => {
     
         if (sequelize !== null) {
             
@@ -362,7 +368,7 @@ try {
             })
             // the controllers are defined in the 'initialize controllers' function.
             // initializeControllers(app);
-    
+            // TODO: CSRF    
             app.post('/do/user/login', function(req, res, next) {
                     console.log('login req body', req.body)
                     passport.authenticate('local', function(err, user, info) {
@@ -393,7 +399,7 @@ try {
                 }
             );
             
-
+            // TODO: CSRF
             app.post('/do/user/login/google', passport.authenticate('google', { scope: ['profile'] }));
 
             // DONE
@@ -408,18 +414,19 @@ try {
                 }
             });
 
+            // TODO: CSRF
             app.post('/do/datasets/register', async (req, res) => {
                 const accession_id = shakeSalt(10);
                 const dataset = await registerDataset({ accession_id, ...req.body });
                 if (dataset) {
-                    return res.send(dataset)
+                    return res.redirect('/accession.html?accession_id='+accession_id)
                 } else {
                     return res.send(500);
                 }
-   
             });
             
             // TODO: gets datasets => post or query params?
+            // TODO: CSRF
             app.get('/datasets/:userId', async (req, res) => {
                 // TODO: check if logged in user === userId!
                 // else unless the role is admin or the dataset is public, don't show
@@ -433,6 +440,7 @@ try {
 
             // TODO: use querystrings to find arbitrary datasets?
             // ensure session is used to check if authenticated and compatible with role
+            // TODO: CSRF
             app.post('/do/query/datasets', async (req, res) => {
                 const query = {
                     where: {
@@ -449,6 +457,7 @@ try {
             });
 
             // enum endpoints
+            // TODO: CSRF
             app.get('/do/query/datasets/states', async (req, res) => {
                 const results = await DatasetState.findAll({ raw: true });
                 if (results) {
@@ -459,6 +468,7 @@ try {
                 }
 
             });
+            // TODO: CSRF
             app.get('/do/query/datasets/datatypes', async (req, res) => {
                 const results = await DatasetType.findAll({ raw: true });
                 if (results) {
@@ -467,6 +477,7 @@ try {
                     res.send(404)
                 }
             });
+            // TODO: CSRF
             app.get('/do/query/datasets/sources', async (req, res) => {
                 const results = await DatasetSource.findAll({ raw: true });
                 if (results) {
@@ -475,7 +486,7 @@ try {
                     res.send(404)
                 }
             });
-
+            // TODO: CSRF
             app.get('/users/:userId/username', async (req, res) => {
                 const results = await User.findOne({
                    where: { id: req.params.userId }
@@ -486,7 +497,7 @@ try {
                     res.send({});
                 }
             });
-
+            // TODO: CSRF
             app.get('/users/:userId/name', async (req, res) => {
                 const results = await User.findOne({
                    where: { id: req.params.userId }
@@ -498,7 +509,7 @@ try {
                 }
             });
 
-
+            // TODO: CSRF
             app.get('/users/roles/', async (req, res) => {
                 const results = await UserRole.findAll();
                 res.setHeader('Content-Type', 'application/json');
