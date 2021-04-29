@@ -448,9 +448,11 @@ try {
             // ensure session is used to check if authenticated and compatible with role
             // TODO: CSRF
             app.post('/do/query/datasets', async (req, res) => {
+                console.log(req.body, req.params)
                 const query = {
                     where: {
-                        ...res.body
+                        // ...req.body
+                        // user_id: 3
                     }
                 }
                 const datasets = await Dataset.findAll(query);

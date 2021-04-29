@@ -17,12 +17,12 @@
                 Let's upload some files.
             </p>
             <p>
-                It is a <span id="datatype" style="text-decoration: underline;"></span> dataset, so you can upload [only single]/[multiple] files.
+                It is a <span id="datatype" style="text-decoration: underline;"></span> dataset, so you can upload <span id="datatype-files" style="text-decoration: underline;"></span> files.
             </p>
             <p>
                 <form>
                     <!-- TODO: restrict accepted file types -->
-                    <input type="file" id="files" name="filename" multiple="true">
+                    <input type="file" id="files" name="filename">
                     <input type="submit" value="Upload Files"/>
                 </form>
             </p>
@@ -52,7 +52,6 @@
         ])
         .then(Object.fromEntries)
         .then(context => {
-            console.log(context.dataset, context.datatypes)
             
             function normalizeBijectionBy(objectArray, prop1, prop2) {
                 let _object = {};
@@ -68,7 +67,16 @@
 
             const datatypeIndex = normalizeBijectionBy(context.datatypes, 'id', 'type');
             document.getElementById("datatype").textContent = datatypeIndex[context.dataset[0].datatype];
-
+            if (context.dataset[0].datatype == 1) {
+                document.getElementById("datatype-files").textContent = 'only single';
+                document.getElementById("files").multiple = false;
+            } else if (context.dataset[0].datatype == 2) {
+                document.getElementById("datatype-files").textContent = 'multiple';
+                document.getElementById("files").multiple = true;
+            } else if (context.dataset[0].datatype == 3) {
+                document.getElementById("datatype-files").textContent = 'multiple';
+                document.getElementById("files").multiple = true;
+            }
         })
 
 
