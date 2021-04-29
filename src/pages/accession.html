@@ -11,22 +11,23 @@
     <body>
         <section id="main">
             <h2>You have registered a dataset.</h2>
-            <h3>The accession number is <span id="accession" style="text-decoration: underline;"></span></h3>
-            <br><p>
+            <h3>Accession ID: <span id="accession" style="text-decoration: underline;"></span></h3>
+            <br>
+            <p>
                 Let's upload some files.
             </p>
             <p>
-                Since your dataset type is _____, you can upload [only single]/[multiple] files.
+                It is a <span id="datatype" style="text-decoration: underline;"></span> dataset, so you can upload [only single]/[multiple] files.
             </p>
-            <div>
+            <p>
                 <form>
                     <!-- TODO: restrict accepted file types -->
-                    <input type="file" id="files" name="filename" multiple="true"><br>
+                    <input type="file" id="files" name="filename" multiple="true">
                     <input type="submit" value="Upload Files"/>
                 </form>
-            </div>
+            </p>
             <p>
-                You can always upload files later, or register more datasets.
+                You can always upload files later, and register more datasets.
             </p>
             <a href="/datasets.html">
                 Go back to datasets page
@@ -38,6 +39,39 @@
         const url =  new URL(window.location.href);
         const accession_id = url.searchParams.get("accession_id");
         document.getElementById("accession").textContent = accession_id;
+
+        const dataset = fetch('/do/query/datasets', { method: 'POST', body: JSON.stringify({ accession_id }) })
+            .catch(console.warn);
+
+        const possible_types = fetch(`/do/query/datasets/datatypes`)
+            .catch(console.warn);
+
+        Promise.all([ 
+            dataset.then(response => response.json()).then(result => ['dataset', result]),
+            possible_types.then(response => response.json()).then(result => ['datatypes', result]),
+        ])
+        .then(Object.fromEntries)
+        .then(context => {
+            console.log(context.dataset, context.datatypes)
+            
+            function normalizeBijectionBy(objectArray, prop1, prop2) {
+                let _object = {};
+                objectArray.forEach(object => {
+                    if (!!prop2) {
+                        _object[object[prop1]] =  object[prop2];
+                    } else {
+                        _object[object[prop1]] =  object;
+                    }
+                })
+                return _object;
+            }
+
+            const datatypeIndex = normalizeBijectionBy(context.datatypes, 'id', 'type');
+            document.getElementById("datatype").textContent = datatypeIndex[context.dataset[0].datatype];
+
+        })
+
+
     </script>
 
 </html>

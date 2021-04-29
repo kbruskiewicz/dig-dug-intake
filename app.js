@@ -250,6 +250,12 @@ Dataset.init({
 
     embargo_date: DataTypes.DATE,
 
+    // e.g. Terra Bucket
+    location: {
+        type: DataTypes.STRING,
+        defaultValue: ''
+    }
+
 }, { sequelize, modelName: 'datasets' })
 
 
