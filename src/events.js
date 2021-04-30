@@ -12,6 +12,9 @@ module.exports = {
             DOWNLOAD_START: 'DOWNLOAD_START',
             DOWNLOAD_SUCCESS: 'UPLOAD_SUCCESS',
             DOWNLOAD_ERROR: 'UPLOAD_ERROR',
+        },
+        accounts: {
+            REGISTERED: 'REGISTERED'
         }
     })
 }

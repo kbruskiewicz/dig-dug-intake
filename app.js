@@ -9,6 +9,7 @@ const GoogleStrategy = require( 'passport-google-oauth20' ).Strategy;
 const flash = require("connect-flash");
 
 const nodemailer = require("nodemailer");
+const emailUtils = require("./src/utils/emailUtils")
 
 const express = require("express");
 
@@ -47,7 +48,7 @@ function initEnumClass(sequelize, SequelizeModel, modelName, prop='name') {
     SequelizeModel.init({ [prop]: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName, timestamps: false })
 }
 
-class UserRole extends Model {};
+class UserRole extends Model {}
 initEnumClass(sequelize, UserRole, 'user_role', 'role');
 
 class User extends Model {}
@@ -83,10 +84,14 @@ User.init({
     },
 
     // useful metadata
-    // googleId: {
-    //     type: DataTypes.STRING,
-    //     defaultValue: '',
-    // },
+    googleId: {
+        type: DataTypes.STRING,
+        defaultValue: '',
+    },
+    confirmed: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+    }
 
 }, { sequelize, modelName: 'user' });
 UserRole.belongsTo(User);
@@ -189,15 +194,15 @@ async function registerUser(username, password, name, email, role, salt=shakeSal
     }
 }
 
-class DatasetState extends Model {};
+class DatasetState extends Model {}
 // DatasetState.init({ state: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName: 'dataset_state' });
 initEnumClass(sequelize, DatasetState, 'dataset_state', 'state');
 
-class DatasetSource extends Model {};
+class DatasetSource extends Model {}
 // DatasetSource.init({ source:  { type: DataTypes.STRING, defaultValue: '' }  }, { sequelize, modelName: 'dataset_source' });
 initEnumClass(sequelize, DatasetSource, 'dataset_source', 'source');
 
-class DatasetType extends Model {};
+class DatasetType extends Model {}
 // DatasetType.init({ type:  { type: DataTypes.STRING, defaultValue: '' }  }, { sequelize, modelName: 'dataset_type' });
 initEnumClass(sequelize, DatasetType, 'dataset_type', 'type');
 
@@ -279,10 +284,9 @@ async function registerDataset({ accession_id, user_id, name, institution, descr
         });
         return dataset;
     } else {
-        console.log('dataset exists')
         return null;
     }
-};
+}
 
 // initialize resources
 try {
@@ -291,7 +295,7 @@ try {
         let context = {};
         return context;
     })
-    .then(async () => {
+    .then(async context => {
         // Generate test SMTP service account from ethereal.email
         // Only needed if you don't have a real mail account for testing
         let testAccount = await nodemailer.createTestAccount();
@@ -324,7 +328,7 @@ try {
         // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
 
         // let context = Object.assign(context, { mail_transporter });
-        // return context;
+        return context;
     })
     .then(async context => {
         
@@ -345,7 +349,7 @@ try {
                 test_user = await User.findOne({ where: { username }});
             }
 
-        };
+        }
 
         return context;
 
@@ -376,32 +380,35 @@ try {
             // initializeControllers(app);
             // TODO: CSRF    
             app.post('/do/user/login', function(req, res, next) {
-                    console.log('login req body', req.body)
-                    passport.authenticate('local', function(err, user, info) {
-                        if (err || !user) {  
-                            // TODO: refactor to enum
-                            if (err === 'nouser') {
-                                // TODO: populate form with defaults?
-                                // conditional redirect:
-                                // username exists => password is wrong
-                                // username does not exist => register (or prompt register)
-                                return res.redirect('/register.html');
-                            } else if (err === 'nopassword') {
-                                // TODO: populate form with defaults?
-                                // conditional redirect:
-                                // username exists => password is wrong
-                                // username does not exist => register (or prompt register)
-                                return res.redirect('/index.html');
+                    if (req.body.action === 'Login') {
+                        passport.authenticate('local', function(err, user, info) {
+                            if (err || !user) {  
+                                // TODO: refactor to enum
+                                if (err === 'nouser') {
+                                    // TODO: populate form with defaults?
+                                    // conditional redirect:
+                                    // username exists => password is wrong
+                                    // username does not exist => register (or prompt register)
+                                    return res.redirect('/register.html');
+                                } else if (err === 'nopassword') {
+                                    // TODO: populate form with defaults?
+                                    // conditional redirect:
+                                    // username exists => password is wrong
+                                    // username does not exist => register (or prompt register)
+                                    return res.redirect('/index.html');
+                                }
+                                return next(err)
                             }
-                            return next(err)
-                        }
-                        req.logIn(user, function(err) {
-                            if (err) { 
-                                return next(err); 
-                            }
-                            return res.redirect('/datasets.html?user=' + user.id);
-                        });
-                    })(req, res, next)
+                            req.logIn(user, function(err) {
+                                if (err) { 
+                                    return next(err); 
+                                }
+                                return res.redirect('/datasets.html?user=' + user.id);
+                            });
+                        })(req, res, next)
+                    } else if (req.body.action === 'Register') {
+                        return res.redirect('/register.html');
+                    }    
                 }
             );
             
@@ -411,13 +418,21 @@ try {
             // DONE
                 // except... sending encrypted password over wire on clientside
             app.post('/do/user/register', async (req, res) => {
-                const { username, password, email, role } = req.body;
-                const newUser = await registerUser(username, password, name, email, role);
-                if (newUser) {
-                    return res.send(200)
-                } else {
-                    return res.send(304)
-                }
+                const { username, password, email, role, name } = req.body;
+                const newUser = await registerUser(username, password, name, email, role)
+                    .then(user => {                        
+                        if (user !== null) {
+                            // TODO: emails
+                            // emailUtils.sendEmail(emailUtils.writeEmailOptions('REGISTERED', {
+                            //     name,
+                            //     username,
+                            // }));
+                            // TODO: prompt message to confirm email.
+                            return res.redirect('/')
+                        } else {
+                            return res.send(304)
+                        }
+                    });
             });
 
             // TODO: CSRF

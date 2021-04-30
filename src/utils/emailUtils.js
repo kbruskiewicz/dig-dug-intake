@@ -15,7 +15,7 @@ function makeConverter(content, contentFill) {
     }
     function makeExtensions(contentFill, valid_tags) {
         let replacements = Object.entries(contentFill || {})
-        if (!!valid_tags) {
+        if (valid_tags) {
             replacements = replacements.filter(fill => valid_tags.includes(fill[0]))
         }
         return replacements.map(filler => ({
@@ -56,6 +56,7 @@ function getEmailBodyToHTML(emailText, params) {
     // TODO: check if params are in the schema?
     return makeConverter(emailText, params).makeHtml(emailText);
 }
+
 let contacts = csvParse(fs.readFileSync('contacts/contacts.csv', 'utf-8').toString(), {
     columns: true,
     skip_empty_lines: true
@@ -66,7 +67,7 @@ function setEmailOptions(emailSubject, emailContent) {
 
     function getTo() {
         return contacts.filter(contact => contact.role === 'researcher').map(contact => contact.email);
-    };
+    }
     function getFrom() {
         return contacts.filter(contact => contact.role === 'admin').map(contact => contact.email)[0];
     }
@@ -99,18 +100,21 @@ function getEmailSubject(type) {
         [events.transfers.DOWNLOAD_START]: `Dataset is being downloaded`,
         [events.transfers.DOWNLOAD_SUCCESS]: `Successful download for dataset`,
         [events.transfers.DOWNLOAD_ERROR]: `Error in download for dataset`,
+        // user account emails
+        [events.accounts.REGISTERED]: `Confirmation of registration`,
     }
     return emailSubjects[type];
 }
 
 function writeEmailOptions(type, params) {
     const emailTemplate = getEmail(type);
+    console.log('email template')
     if (emailTemplate !== '') {
         const emailContent = getEmailBodyToHTML(emailTemplate, params);
         const emailSubject = getEmailSubject(type);
         const emailOptions = setEmailOptions(emailSubject, emailContent);
         return emailOptions;
-    };
+    }
     return {};
 }
 

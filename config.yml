@@ -1,0 +1,22 @@
+db: 
+  dialect: mysql
+  username: root
+  password: ''
+  database: intake
+  host: localhost # for some reason, no port required - there exists a default?
+port: 3000
+session_key: 'netherworlds'
+crypto:
+  default_encoding: 'hex'
+  hash_implementation: 'sha512'
+  key_size: 64
+  iterations: 100000
+test:
+  username: 'janedoe'
+  password: 'janedoe'
+  name: 'Jane Doe'
+auth:
+  google:
+      secretId: heYzX5OtHM5j8xCsGuYWj1k6
+      clientId: 517733971364-d02ebbnf2t5cjgog6rn6re5a666gru41.apps.googleusercontent.com
+      callbackHost: localhost.com:3000

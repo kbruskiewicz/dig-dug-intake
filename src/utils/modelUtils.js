@@ -19,7 +19,7 @@ const schemaDatasetUploadRequest = {
     author: DataTypes.STRING,
     status: DataTypes.ENUM(Object.values(events.transfers)),
 }
-class DatasetUploadRequest extends Model {};
+class DatasetUploadRequest extends Model {}
 DatasetUploadRequest.init(schemaDatasetUploadRequest, { sequelize, modelName: 'dataset_uploads' })
 
 async function initDB() {
