@@ -79,7 +79,7 @@
 
         const url =  new URL(window.location.href);
         const user_id = url.searchParams.get("user");
-        let json = null;
+        let datasets = null;
         let username = null;
         if (user_id) {
 
@@ -93,7 +93,7 @@
             });
             document.getElementById('embargo_date').value = new Date().toDateInputValue();
 
-            json = fetch('/do/query/datasets', 
+            datasets = fetch('/do/query/datasets', 
                 { 
                     method: 'POST',
                     headers: {
@@ -108,15 +108,12 @@
                 document.getElementById('provider').value = username;
             }
             const username = fetch(`/users/${user_id}/name`)
+                .then(response => response.json())
                 .then(displayUsers)
                 .catch(console.warn);
-
-           ;
-
-    
         } else {
             console.warn('No user_id given on the datasets page!')
-            json = fetch('/do/query/datasets', 
+            datasets = fetch('/do/query/datasets', 
                 { 
                     method: 'POST',
                     headers: {
@@ -134,7 +131,7 @@
             .catch(console.warn);    
 
         Promise.all([
-            json.then(r => r.json()).then(j => ['datasets', j]), 
+            datasets.then(r => r.json()).then(j => ['datasets', j]), 
             possible_sources.then(r => r.json()).then(j => ['sources', j]), 
             possible_types.then(r => r.json()).then(j => ['datatypes', j])
         ]).then(results => {
