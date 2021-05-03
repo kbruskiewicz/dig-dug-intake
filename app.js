@@ -280,7 +280,7 @@ async function registerDataset({ accession_id, user_id, name, institution, descr
             state,
             datatype,
             embargo_date,
-            state: 0,
+            state: 0,  // all datasets are initialized in state 0
         });
         return dataset;
     } else {
@@ -296,42 +296,48 @@ try {
         return context;
     })
     .then(async context => {
-        // Generate test SMTP service account from ethereal.email
-        // Only needed if you don't have a real mail account for testing
-        let testAccount = await nodemailer.createTestAccount();
+        let _context = context;
+        let mail_transporter = null;
+        let emailConfig = loadedConfig.email;
 
-        // create reusable transporter object using the default SMTP transport
-        let mail_transporter = nodemailer.createTransport({
-            host: "smtp.ethereal.email",
-            port: 587,
-            secure: false, // true for 465, false for other ports
-            auth: {
-                user: testAccount.user, // generated ethereal user
-                pass: testAccount.pass, // generated ethereal password
-            },
-        });
+        if (!!!emailConfig) {
+            mail_transporter = await emailUtils.makeTestEmailTransporter();
+            // send mail with defined transport object
+            let info = await mail_transporter.sendMail({
+                from: '"Fred Foo 👻" <foo@example.com>', // sender address
+                to: "bar@example.com, baz@example.com", // list of receivers
+                subject: "Hello ✔", // Subject line
+                text: "Hello world?", // plain text body
+                html: "<b>Hello world?</b>", // html body
+            });
 
-        // send mail with defined transport object
-        let info = await mail_transporter.sendMail({
-            from: '"Fred Foo 👻" <foo@example.com>', // sender address
-            to: "bar@example.com, baz@example.com", // list of receivers
-            subject: "Hello ✔", // Subject line
-            text: "Hello world?", // plain text body
-            html: "<b>Hello world?</b>", // html body
-        });
+            console.log("Message sent: %s", info.messageId);
+            // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
 
-        console.log("Message sent: %s", info.messageId);
-        // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
+            // Preview only available when sending through an Ethereal account
+            console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+            // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
 
-        // Preview only available when sending through an Ethereal account
-        console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-        // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
+        } else {
+            mail_transporter = nodemailer.createTransport({
+                host: emailConfig.host,
+                port: emailConfig.port,
+                secure: emailConfig.secure,
+                auth: {
+                    user: emailConfig.auth.user, // generated ethereal user
+                    pass: emailConfig.auth.pass, // generated ethereal password
+                },
+            });
+        }
 
-        // let context = Object.assign(context, { mail_transporter });
-        return context;
+        if (!!mail_transporter) {
+            _context['mail_transporter'] = mail_transporter;
+        }
+        
+        return _context;
     })
     .then(async context => {
-        
+
         const username = loadedConfig.test.username;
         const password = loadedConfig.test.password;
         const name = loadedConfig.test.name;
@@ -419,20 +425,36 @@ try {
                 // except... sending encrypted password over wire on clientside
             app.post('/do/user/register', async (req, res) => {
                 const { username, password, email, role, name } = req.body;
-                const newUser = await registerUser(username, password, name, email, role)
-                    .then(user => {                        
-                        if (user !== null) {
-                            // TODO: emails
-                            // emailUtils.sendEmail(emailUtils.writeEmailOptions('REGISTERED', {
-                            //     name,
-                            //     username,
-                            // }));
-                            // TODO: prompt message to confirm email.
-                            return res.redirect('/')
-                        } else {
-                            return res.send(304)
-                        }
-                    });
+                const user = await registerUser(username, password, name, email, role);
+                if (user !== null) {
+
+                    // TODO: generate registration token & confirm link
+                    const confirmation_token = '';
+                    const confirm_link = `${loadedConfig.domain.host}/do/user/confirm?token=${confirmation_token}`;
+
+                    emailUtils.sendEmail(emailUtils.writeEmailOptions('REGISTERED', {
+                        name,
+                        username,
+                        // the parser can't handle keys with underscores
+                        confirmlink: confirm_link,
+                    }), context.mail_transporter);
+
+                    return res.redirect('/');
+
+                } else {
+                    
+                    return res.send(304);
+
+                }
+            });
+
+            app.post('/do/user/confirm', async (req, res) => {
+                const confirm = null;
+                if (confirm !== null) {
+                    return res.send(200)
+                } else {
+                    return res.send(304)
+                }
             });
 
             // TODO: CSRF
@@ -466,7 +488,7 @@ try {
                 console.log(req.body, req.params)
                 const query = {
                     where: {
-                        // ...req.body
+                        ...req.body
                         // user_id: 3
                     }
                 }

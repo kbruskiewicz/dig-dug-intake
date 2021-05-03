@@ -108,7 +108,6 @@ function getEmailSubject(type) {
 
 function writeEmailOptions(type, params) {
     const emailTemplate = getEmail(type);
-    console.log('email template')
     if (emailTemplate !== '') {
         const emailContent = getEmailBodyToHTML(emailTemplate, params);
         const emailSubject = getEmailSubject(type);
@@ -118,8 +117,7 @@ function writeEmailOptions(type, params) {
     return {};
 }
 
-async function sendEmail(emailOptions) {
-    console.log('sending email...')
+async function makeTestEmailTransporter() {
     // Generate test SMTP service account from ethereal.email
     // Only needed if you don't have a real mail account for testing
     let testAccount = await nodemailer.createTestAccount();
@@ -134,9 +132,17 @@ async function sendEmail(emailOptions) {
         pass: testAccount.pass, // generated ethereal password
       },
     });
-  
+    return transporter
+}
+
+async function sendEmail(emailOptions, transporter) {
+    let _transporter = transporter;
+    if (!!!_transporter) {
+        _transporter = await makeTestEmailTransporter();
+    }
+
     // send mail with defined transport object
-    let info = await transporter.sendMail(emailOptions);
+    let info = await _transporter.sendMail(emailOptions);
   
     // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
     console.log("Message sent: %s", info.messageId);
@@ -147,6 +153,7 @@ async function sendEmail(emailOptions) {
 }
 
 module.exports = {
+    makeTestEmailTransporter,
     writeEmailOptions,
     sendEmail,
 }

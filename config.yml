@@ -1,3 +1,13 @@
+domain: 
+  host: 'localhost:3000'
+  root: '/'
+# email:
+#   host: "smtp.ethereal.email",
+#   port: 587,
+#   secure: false # true for 465, false for other ports
+#   auth:
+#     user: testAccount.user # generated ethereal user
+#     pass: testAccount.pass # generated ethereal password
 db: 
   dialect: mysql
   username: root
@@ -5,7 +15,7 @@ db:
   database: intake
   host: localhost # for some reason, no port required - there exists a default?
 port: 3000
-session_key: 'netherworlds'
+session_key: 'netherworlds'  
 crypto:
   default_encoding: 'hex'
   hash_implementation: 'sha512'

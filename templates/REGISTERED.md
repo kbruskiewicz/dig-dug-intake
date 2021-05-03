@@ -3,10 +3,10 @@
 
 Hello {{name}},
 
-You have successfully registered an account, as {{username}}.
+You have successfully registered an account with the AMP Data Intake site, as {{username}}.
 
-To confirm your registration, please click the following link.
+To confirm your registration, please click the following link:
 
-{{confirm_link}}
+[Confirm account registration]({{confirmlink}})
 
 If you have not registered for the data intake portal, ignore this email.
