@@ -49,25 +49,8 @@ app.use(flash());
 
 
 // BEGIN: AUTHENTICATION CONFIGURATION
-passport.use(new LocalStrategy(
-    async function(username, password, done) {
-        const user = await model.userExists({ username });
-        const authenticate = function(err=null, user) {
-            if (err) { return done(err); }
-            
-            if (!user) {
-                return done('nouser', false, { message: 'Incorrect username.' });
-            }
-            const userModel = user.dataValues;
-            if (authUtils.validatePassword(password, userModel.password_salt, userModel.hash_function)(userModel.password_hash)) {
-                return done(null, userModel);
-            } else {
-                return done('nopassword', false, { message: 'Incorrect password.' });
-            }
-        }
-        authenticate(null, user);
-    }
-));
+passport.use(authUtils.strategy.local);
+passport.use(authUtils.strategy.google);
 
 passport.serializeUser((user, done) => {
     done(null, user.id);
@@ -78,19 +61,7 @@ passport.deserializeUser(async (id, done) => {
     done(null, user);
 });
 
-// TODO: alternative authentication strategies
-passport.use(new GoogleStrategy({
-    clientID: loadedConfig.auth.google.clientId,
-    clientSecret: loadedConfig.auth.google.secretId,
-    // callbackURL: `http://${loadedConfig.auth.google.callbackHost}`
-  },
-  function(accessToken, refreshToken, profile, cb) {
-        console.log(profile)
-        // User.findOrCreate({ googleId: profile.id }, function (err, user) {
-        //     return cb(err, user);
-        // });
-  }
-));
+
 // END: AUTHENTICATION CONFIGURATION
 
 
