@@ -46,8 +46,49 @@ app.use(flash());
 
 
 // BEGIN: AUTHENTICATION CONFIGURATION
-passport.use(authUtils.strategy.local);
-passport.use(authUtils.strategy.google);
+
+// LOGIN STRATEGIES //
+
+const localStrategyImpl = new LocalStrategy(
+    async function(username, password, done) {
+        const user = await model.userExists({ username });
+        const authenticate = function(err=null, user) {
+            if (err) { return done(err); }
+            
+            if (!user) {
+                return done('nouser', false, { message: 'Incorrect username.' });
+            }
+            const userModel = user.dataValues;
+            if (authUtils.validatePassword(password, userModel.password_salt, userModel.hash_function)(userModel.password_hash)) {
+                return done(null, userModel);
+            } else {
+                return done('nopassword', false, { message: 'Incorrect password.' });
+            }
+        }
+        authenticate(null, user);
+    }
+);
+
+// TODO: external account login verification
+
+// TODO: google login
+const googleStrategyImpl = new GoogleStrategy({
+    clientID: loadedConfig.auth.google.clientId,
+    clientSecret: loadedConfig.auth.google.secretId,
+    // callbackURL: `http://${loadedConfig.auth.google.callbackHost}`
+  },
+  function(accessToken, refreshToken, profile, cb) {
+        console.log(profile)
+        // User.findOrCreate({ googleId: profile.id }, function (err, user) {
+        //     return cb(err, user);
+        // });
+  }
+)
+
+// END LOGIN STRATEGIES //
+
+passport.use(localStrategyImpl);
+passport.use(googleStrategyImpl);
 
 passport.serializeUser((user, done) => {
     done(null, user.id);
@@ -57,8 +98,6 @@ passport.deserializeUser(async (id, done) => {
     const user = await model.userExists({ id });    
     done(null, user);
 });
-
-
 // END: AUTHENTICATION CONFIGURATION
 
 
@@ -287,11 +326,12 @@ try {
                 console.log(req.body, req.params)
                 const query = {
                     where: {
-                        ...req.body
-                        // user_id: 3
+                        ...req.body,
+                        visible: 1, // visibility access control? visible datasets only
                     }
                 }
                 const datasets = await model.allDatasets(query);
+                console.log(datasets)
                 // TODO: filter by user permissions!
                 if (datasets) {
                     res.send(datasets)

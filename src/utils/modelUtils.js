@@ -2,7 +2,7 @@ const config = require("../../config");
 const loadedConfig = config.loadConfig();
 
 const authUtils = require("./authUtils")
-
+const merge = require("lodash.merge")
 const { events } = require('../events');
 const { Sequelize, Model, DataTypes } = require('sequelize');
 
@@ -217,9 +217,20 @@ Dataset.init({
     location: {
         type: DataTypes.STRING,
         defaultValue: ''
+    },
+
+    visible: {
+        type: DataTypes.NUMBER,
+        defaultValue: 1,
     }
 
 }, { sequelize, modelName: 'datasets' })
+
+// this is a specially implemented call for getting datasets because they have specific visibility constraints
+// function allDatasets(query) {
+//     // going to restrict the datasets to only those considered globally visible?
+//     return async args => await Dataset.findAll(merge({ where: { visible: 1 }}), args);
+// }
 
 async function registerDataset({ accession_id, user_id, name, institution, description, provider, principal_investigator, source, state, datatype, embargo_date }) {   
     const datasetExists = await Dataset.findOne({ where: { accession_id } }) !== null;
