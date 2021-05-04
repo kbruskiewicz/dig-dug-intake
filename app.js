@@ -15,18 +15,15 @@ const flash = require("connect-flash");
 const nodemailer = require("nodemailer");
 const emailUtils = require("./src/utils/emailUtils")
 
-const express = require("express");
-
-// TODO: HTTPS
+// https
+const fs = require("fs");  // will be used to read key and cert files
 const https = require("https");
 
+const express = require("express");
+
+
+
 const app = express();
-https.createServer({
-    key: fs.readFileSync(`${loadedConfig.https.key}`),
-    cert: fs.readFileSync(`${loadedConfig.https.cert}`)
-}, app).listen(3000, function () {
-    console.log('Example app listening on port 3000! Go to https://localhost:3000/')
-})
 
 // middleware
 // request data parsing middleware
@@ -388,10 +385,17 @@ try {
                 res.send(JSON.stringify(results));
             });
 
+
+
+            // INITIALIZE THE SERVER
             const port = loadedConfig.port;
-            app.listen(port, () => {
-                console.log('App started on port:', port)
+            https.createServer({
+                key: fs.readFileSync(`${loadedConfig.https.key}`),
+                cert: fs.readFileSync(`${loadedConfig.https.cert}`)
+            }, app).listen(port, () => {
+                console.log('[HTTPS] App started on port:', port)
             })
+            
         
     })
 } catch(error) {

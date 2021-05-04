@@ -28,3 +28,6 @@ pnpm-debug.log*
 
 # Memory
 *.swp
+
+# config
+config.yml
