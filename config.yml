@@ -33,3 +33,6 @@ auth:
   jwt:
     # recommend generating this as a 64 byte hex string
     token_secret: '1a48906e8d5e578e8c7e3e87b1c6b9b653b9c6fb50880808323a29cb7dd573b999192fe2a832ce74c30145fb6d3c9e7727c30f2e545335a9dd15d30c187ed42c'
+https:
+  src: './sslcert/'
+  keyname: ''

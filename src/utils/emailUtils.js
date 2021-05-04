@@ -36,11 +36,6 @@ function makeConverter(content, contentFill) {
     return converter;
 }
 
-// TODO: COPYWRITING PROBLEM!!!
-// TODO: use showdown?
-// Use Markdown email templates!
-// Use Retool!
-
 function getEmail(messageType) {
     try {
         fs.accessSync(`templates/${messageType}.md`);

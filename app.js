@@ -1,152 +1,84 @@
 const config = require("./config");
+const loadedConfig = config.loadConfig();
 
-const { Sequelize, DataTypes, Model, UniqueConstraintError } = require('sequelize');
+// model
+const model = require("./src/utils/modelUtils");
 
-const crypto = require('crypto');
+// authentication
+const authUtils = require("./src/utils/authUtils");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 const GoogleStrategy = require( 'passport-google-oauth20' ).Strategy;
 const flash = require("connect-flash");
 
+// emails
 const nodemailer = require("nodemailer");
 const emailUtils = require("./src/utils/emailUtils")
 
 const express = require("express");
 
-const loadedConfig = config.loadConfig();
-
 // TODO: HTTPS
+const https = require("https");
+
 const app = express();
+https.createServer({
+    key: fs.readFileSync(`${loadedConfig.https.key}`),
+    cert: fs.readFileSync(`${loadedConfig.https.cert}`)
+}, app).listen(3000, function () {
+    console.log('Example app listening on port 3000! Go to https://localhost:3000/')
+})
+
 // middleware
+// request data parsing middleware
 app.use(require('cookie-parser')());
 app.use(require('body-parser').urlencoded({ extended: true }));
+
+// authentication middleware
 app.use(require('express-session')({
     secret: loadedConfig.session_key,
     resave: true,
     saveUninitialized: true
 }));
-app.use(flash());
 app.use(passport.initialize());
 app.use(passport.session());
 
-let sequelize = null;
-if (loadedConfig.db.host === 'sqlite::memory:') {
-    sequelize = new Sequelize(loadedConfig.db.host, {
-        logging: console.log
-    })
-} else {
-    const { database, username, password, dialect, host } = loadedConfig.db;
-    sequelize = new Sequelize(database, username, password, {
-        dialect,
-        host,
-        logging: console.log
-    })
-}
-
-// an enum class
-function initEnumClass(sequelize, SequelizeModel, modelName, prop='name') {
-    SequelizeModel.init({ [prop]: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName, timestamps: false })
-}
-
-class UserRole extends Model {}
-initEnumClass(sequelize, UserRole, 'user_role', 'role');
-
-class User extends Model {}
-User.init({
-    // authentication information
-    username: {
-        type: DataTypes.STRING,
-    },
-    password_hash: {
-        type: DataTypes.STRING,
-    },
-    password_salt: {
-        type: DataTypes.STRING,
-    },
-    hash_function: {
-        type: DataTypes.STRING,
-    },
-
-    // useful metadata
-    name: {
-        type: DataTypes.STRING,
-    },
-    email: {
-        type: DataTypes.STRING,
-        validate: {
-            isEmail: true,            // checks for email format (foo@bar.com)
-        }
-    },
-    role: {
-        // TODO: roles - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.ENUM(''),
-        defaultValue: '',
-    },
-
-    // useful metadata
-    googleId: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    confirmed: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true,
-    }
-
-}, { sequelize, modelName: 'user' });
-UserRole.belongsTo(User);
-
-// convert passwords into cryptographically secure information
-
-// first: salt generator
-const shakeSalt = (
-    buffer_size=10
-) => {
-    const buf = Buffer.alloc(buffer_size);
-    return crypto.randomFillSync(buf).toString('hex');
-}
-
-// use pbkdf2 (node implementation)
-const obscurePassword = (
-    password,
-    hash_implementation,
-    salt=shakeSalt(),
-) => crypto.pbkdf2Sync(password, salt, 100000, 32, hash_implementation).toString('hex');
-
-// validate presented password strings against the obscured password
-const validatePassword = (
-    given_password, 
-    password_salt, 
-    hash_implementation
-) => obscured_password => obscurePassword(given_password, hash_implementation, password_salt) === obscured_password;
+// used by authentication middleware to render status messages on events
+// TODO: needs testing
+app.use(flash());
 
 
+
+// BEGIN: AUTHENTICATION CONFIGURATION
 passport.use(new LocalStrategy(
     async function(username, password, done) {
-
-        const user = await User.findOne({ 
-            where: { username } 
-        });
-
+        const user = await model.userExists({ username });
         const authenticate = function(err=null, user) {
             if (err) { return done(err); }
             
             if (!user) {
                 return done('nouser', false, { message: 'Incorrect username.' });
             }
-
             const userModel = user.dataValues;
-            if (validatePassword(password, userModel.password_salt, userModel.hash_function)(userModel.password_hash)) {
+            if (authUtils.validatePassword(password, userModel.password_salt, userModel.hash_function)(userModel.password_hash)) {
                 return done(null, userModel);
             } else {
                 return done('nopassword', false, { message: 'Incorrect password.' });
             }
         }
-
         authenticate(null, user);
     }
 ));
 
+passport.serializeUser((user, done) => {
+    done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+    const user = await model.userExists({ id });    
+    done(null, user);
+});
+
+// TODO: alternative authentication strategies
 passport.use(new GoogleStrategy({
     clientID: loadedConfig.auth.google.clientId,
     clientSecret: loadedConfig.auth.google.secretId,
@@ -159,229 +91,128 @@ passport.use(new GoogleStrategy({
         // });
   }
 ));
-
-passport.serializeUser((user, done) => {
-    done(null, user.id);
-});
-
-passport.deserializeUser(async (id, done) => {
-    const user = await User.findOne({ 
-        where: { id } 
-    });    
-    done(null, user);
-});
-
-async function userExists(username) {
-    return await User.findOne({ where: { username } })
-}
-
-async function registerUser(username, password, name, email, role, salt=shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation) {
-    // TODO: guarantee that user IDs are UUIDs
-    // should be generated in SQL
-    if (!(await userExists(username))) {
-        const user = await User.create({
-            username: username,
-            name: name,
-            password_salt: salt,
-            password_hash: obscurePassword(password, hash_function, salt),
-            hash_function: hash_function,
-            email,
-            role,
-        });
-        return user;
-    } else {
-        return null;
-    }
-}
-
-class DatasetState extends Model {}
-// DatasetState.init({ state: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName: 'dataset_state' });
-initEnumClass(sequelize, DatasetState, 'dataset_state', 'state');
-
-class DatasetSource extends Model {}
-// DatasetSource.init({ source:  { type: DataTypes.STRING, defaultValue: '' }  }, { sequelize, modelName: 'dataset_source' });
-initEnumClass(sequelize, DatasetSource, 'dataset_source', 'source');
-
-class DatasetType extends Model {}
-// DatasetType.init({ type:  { type: DataTypes.STRING, defaultValue: '' }  }, { sequelize, modelName: 'dataset_type' });
-initEnumClass(sequelize, DatasetType, 'dataset_type', 'type');
+// END: AUTHENTICATION CONFIGURATION
 
 
-class Dataset extends Model {}
-Dataset.init({
-    // database mechanics
-    user_id: DataTypes.STRING,
-    accession_id: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    
-    name: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    institution: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    provider: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    principal_investigator: {
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    description: {
-        type: DataTypes.TEXT,
-        defaultValue: ''
-    },
-    
-    source: {
-        // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    state: {
-        // TODO: states - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
-    datatype: {
-        // TODO: states - how to generate them programatically? => reference another table => convert to FKEYS
-        type: DataTypes.STRING,
-        defaultValue: '',
-    },
 
-    embargo_date: DataTypes.DATE,
-
-    // e.g. Terra Bucket
-    location: {
-        type: DataTypes.STRING,
-        defaultValue: ''
-    }
-
-}, { sequelize, modelName: 'datasets' })
-
-
-async function registerDataset({ accession_id, user_id, name, institution, description, provider, principal_investigator, source, state, datatype, embargo_date }) {   
-    const datasetExists = await Dataset.findOne({ where: { accession_id } }) !== null;
-    if (!datasetExists) {
-        const dataset = await Dataset.create({
-            accession_id,
-            user_id,
-            // accessions should either be generated here or within SQL
-            // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
-            name,
-            institution,
-            principal_investigator, 
-            description, provider, 
-            source,
-            state,
-            datatype,
-            embargo_date,
-            state: 0,  // all datasets are initialized in state 0
-        });
-        return dataset;
-    } else {
-        return null;
-    }
-}
-
-// initialize resources
+// initialize server
 try {
-    sequelize.sync()
-    .then(() => {
-        let context = {};
-        return context;
-    })
-    .then(async context => {
-        let _context = context;
-        let mail_transporter = null;
-        let emailConfig = loadedConfig.email;
+    // initialize database and database connection
+    // synchronize model with database
+    model.initDB().sync()
+        // create a "context" object to be passed through the promise chain
+        // lets us segregate out resource initializations (like DB, email) into different steps
+        .then(() => {
+            let context = {};
+            return context;
+        })
+        // email resource initialization
+        // fire out a test email to a nonesense account to ensure the connection logic works
+        .then(async context => {
+            let _context = context;
+            let mail_transporter = null;
+            let emailConfig = loadedConfig.email;
 
-        if (!!!emailConfig) {
-            mail_transporter = await emailUtils.makeTestEmailTransporter();
-            // send mail with defined transport object
-            let info = await mail_transporter.sendMail({
-                from: '"Fred Foo 👻" <foo@example.com>', // sender address
-                to: "bar@example.com, baz@example.com", // list of receivers
-                subject: "Hello ✔", // Subject line
-                text: "Hello world?", // plain text body
-                html: "<b>Hello world?</b>", // html body
-            });
+            if (!!!emailConfig) {
+                // by default: this is the test transporter
+                mail_transporter = await emailUtils.makeTestEmailTransporter();
 
-            console.log("Message sent: %s", info.messageId);
-            // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
+                // send mail with defined transport object
+                let info = await mail_transporter.sendMail({
+                    from: '"Fred Foo 👻" <foo@example.com>', // sender address
+                    to: "bar@example.com, baz@example.com", // list of receivers
+                    subject: "Hello ✔", // Subject line
+                    text: "Hello world?", // plain text body
+                    html: "<b>Hello world?</b>", // html body
+                });
 
-            // Preview only available when sending through an Ethereal account
-            console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-            // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
+                console.log("Message sent: %s", info.messageId);
+                // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
 
-        } else {
-            mail_transporter = nodemailer.createTransport({
-                host: emailConfig.host,
-                port: emailConfig.port,
-                secure: emailConfig.secure,
-                auth: {
-                    user: emailConfig.auth.user, // generated ethereal user
-                    pass: emailConfig.auth.pass, // generated ethereal password
-                },
-            });
-        }
+                // Preview only available when sending through an Ethereal account
+                console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+                // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
 
-        if (!!mail_transporter) {
-            _context['mail_transporter'] = mail_transporter;
-        }
-        
-        return _context;
-    })
-    .then(async context => {
-
-        const username = loadedConfig.test.username;
-        const password = loadedConfig.test.password;
-        const name = loadedConfig.test.name;
-
-        if (!!username && !!password) {
-            
-            let test_user = await registerUser(username, password, name);
-            if (test_user) {
-                console.log(test_user.toJSON())
             } else {
-                console.log(username, 'already exists')
+                mail_transporter = nodemailer.createTransport({
+                    host: emailConfig.host,
+                    port: emailConfig.port,
+                    secure: emailConfig.secure,
+                    auth: {
+                        user: emailConfig.auth.user, // generated ethereal user
+                        pass: emailConfig.auth.pass, // generated ethereal password
+                    },
+                });
+
+                // TODO: test with dummy email? (signalling current deployment)
+
             }
 
-            if (test_user === null) {
-                test_user = await User.findOne({ where: { username }});
+            if (!!mail_transporter) {
+                _context['mail_transporter'] = mail_transporter;
             }
-
-        }
-
-        return context;
-
-    }).then(async context => {
-    
-        if (sequelize !== null) {
             
+            return _context;
+        })
+        .then(async context => {
+
+            // test the database connection with a test user
+            // the test user will also be accessible within the application
+            // if no such user is given in the configuration, the test user won't be created
+            // thus in a production deployment you won't require it
+            // TODO: is this a bad idea to include inside the code anyway?
+
+            const username = loadedConfig.test.username;
+            const password = loadedConfig.test.password;
+            const name = loadedConfig.test.name;
+
+            if (!!username && !!password) {
+                
+                let test_user = await model.registerUser(username, password, name);
+                if (test_user) {
+                    console.log(test_user.toJSON())
+                } else {
+                    console.log(username, 'already exists')
+                }
+
+                if (test_user === null) {
+                    test_user = await model.userExists({ username });
+                }
+
+            }
+
+            return context;
+
+        })
+        .then(async context => {
+            
+            // import html pages to be visible in the application
             app.use('/', express.static('src/pages/'));
+
+            // import scripts into a local path
             app.use('/modules', express.static('node_modules/'));
 
-            // TODO: model page flow with state machine
+            // TODO: model page flow with state machine?
+            // these endpoints rely on 'pages' being defined
             app.get('/register', (_, res) => res.redirect('/register.html'));
             app.get('/login', (_, res) => res.redirect('/index.html'));
             app.get('/datasets', (_, res) => res.redirect('/datasets.html'));
             app.get('/upload', (_, res) => res.redirect('/uploader.html'));
             app.get('/download', (_, res) => res.redirect('/downloader.html'));
 
+            // test endpoints
+            // used when modeling the logic of client functions or redirect functions
+            // before their content is decided upon
             app.get('/test/success', (req, res) => {
                 console.log('success')
                 res.send('/')
             })
-
             app.get('/test/fail', (req, res) => {
                 console.error('error')
                 res.send(500)
-            })
+            });
+
+
             // the controllers are defined in the 'initialize controllers' function.
             // initializeControllers(app);
             // TODO: CSRF    
@@ -425,7 +256,7 @@ try {
                 // except... sending encrypted password over wire on clientside
             app.post('/do/user/register', async (req, res) => {
                 const { username, password, email, role, name } = req.body;
-                const user = await registerUser(username, password, name, email, role);
+                const user = await model.registerUser(username, password, name, email, role);
                 if (user !== null) {
 
                     // TODO: generate registration token & confirm link
@@ -457,10 +288,10 @@ try {
                 }
             });
 
-            // TODO: CSRF
+            // TODO: CSRF/JWT
             app.post('/do/datasets/register', async (req, res) => {
-                const accession_id = shakeSalt(10);
-                const dataset = await registerDataset({ accession_id, ...req.body });
+                const accession_id = authUtils.shakeSalt(10);
+                const dataset = await model.registerDataset({ accession_id, ...req.body });
                 if (dataset) {
                     return res.redirect('/accession.html?accession_id='+accession_id)
                 } else {
@@ -473,7 +304,7 @@ try {
             app.get('/datasets/:userId', async (req, res) => {
                 // TODO: check if logged in user === userId!
                 // else unless the role is admin or the dataset is public, don't show
-                const datasets = await Dataset.findAll({ where: { user_id: req.params.userId }});
+                const datasets = await model.allDatasets({ user_id: req.params.userId });
                 if (datasets) {
                     res.send(datasets)
                 } else {
@@ -492,7 +323,7 @@ try {
                         // user_id: 3
                     }
                 }
-                const datasets = await Dataset.findAll(query);
+                const datasets = await model.allDatasets(query);
                 // TODO: filter by user permissions!
                 if (datasets) {
                     res.send(datasets)
@@ -504,7 +335,7 @@ try {
             // enum endpoints
             // TODO: CSRF
             app.get('/do/query/datasets/states', async (req, res) => {
-                const results = await DatasetState.findAll({ raw: true });
+                const results = await model.allDatasetStates({ raw: true });
                 if (results) {
                     res.setHeader('Content-Type', 'application/json');
                     res.send(results);
@@ -515,7 +346,7 @@ try {
             });
             // TODO: CSRF
             app.get('/do/query/datasets/datatypes', async (req, res) => {
-                const results = await DatasetType.findAll({ raw: true });
+                const results = await model.allDatasetTypes({ raw: true });
                 if (results) {
                     res.send(results);
                 } else {
@@ -524,7 +355,7 @@ try {
             });
             // TODO: CSRF
             app.get('/do/query/datasets/sources', async (req, res) => {
-                const results = await DatasetSource.findAll({ raw: true });
+                const results = await model.allDatasetSources({ raw: true });
                 if (results) {
                     res.send(results);
                 } else {
@@ -533,9 +364,7 @@ try {
             });
             // TODO: CSRF
             app.get('/users/:userId/username', async (req, res) => {
-                const results = await User.findOne({
-                   where: { id: req.params.userId }
-                })
+                const results = await model.userExists({ id: req.params.userId })
                 if (results) {
                     res.send(JSON.stringify(results.dataValues.username));    
                 } else {
@@ -544,9 +373,7 @@ try {
             });
             // TODO: CSRF
             app.get('/users/:userId/name', async (req, res) => {
-                const results = await User.findOne({
-                   where: { id: req.params.userId }
-                })
+                const results = await model.userExists({ id: req.params.userId })
                 if (results) {
                     res.send(JSON.stringify(results.dataValues.name));    
                 } else {
@@ -556,7 +383,7 @@ try {
 
             // TODO: CSRF
             app.get('/users/roles/', async (req, res) => {
-                const results = await UserRole.findAll();
+                const results = await model.allUserRoles();
                 res.setHeader('Content-Type', 'application/json');
                 res.send(JSON.stringify(results));
             });
@@ -566,13 +393,9 @@ try {
                 console.log('App started on port:', port)
             })
         
-        } else {
-            console.error('database failed to initialize');
-        }
-    
     })
 } catch(error) {
-    console.log(error)
+    console.error(error)
 }
 
 
