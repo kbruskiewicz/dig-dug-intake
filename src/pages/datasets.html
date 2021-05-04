@@ -1,18 +1,27 @@
 <html>
     <head>
         <meta charset="utf8">
+
+        <script src="https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js"></script>
+
+        <!-- <script src="https://cdn.jsdelivr.net/npm/jquery-bootgrid@1.3.1/dist/jquery.bootgrid.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-bootgrid@1.3.1/dist/jquery.bootgrid.css"> -->
+        
+        <script src="//cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+        <link rel="stylesheet" href="//cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
+
         <link rel="stylesheet" href="index.css">
-        <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-        <script src="/modules/"></script>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@exampledev/new.css@1/new.min.css">
         <link rel="stylesheet" href="https://fonts.xz.style/serve/inter.css">
+
+
     </head>
  
     <body style="max-width: none;">
 
         <section id="main">
             <h3 class="title" id="show-datasets">Datasets</h3>
-            <div class="table-wrapper" id="show-datasets-table"></div>   
+            <div class="table-wrapper" id="show-datasets-table-wrapper"></div>   
             <h3 class="title" id="register-datasets">Register Dataset</h3>
             <!-- <iframe name="hiddenFrame" width="0" height="0" border="0" style="display: none;"></iframe> -->
             <form method="post" action="/do/datasets/register">
@@ -76,7 +85,7 @@
         </section>
     </body>
     <script>
-
+    $(document).ready(function(){
         const url =  new URL(window.location.href);
         const user_id = url.searchParams.get("user");
         let datasets = null;
@@ -150,9 +159,8 @@
                 const table = document.createElement('table');
                 table.setAttribute('name', name);
 
-                const tableBody = document.createElement('tbody');
-
-                table.appendChild(tableBody);
+                const tableHead = document.createElement('thead');
+                table.appendChild(tableHead);
 
                 const header = document.createElement('tr');
                 fields.forEach(field => {
@@ -160,7 +168,10 @@
                     col.appendChild(document.createTextNode(field));
                     header.appendChild(col);
                 })
-                tableBody.appendChild(header);
+                tableHead.appendChild(header);
+
+                const tableBody = document.createElement('tbody');
+                table.appendChild(tableBody);
 
                 for (index in arrayOfStructs) {
                     const row = document.createElement('tr');
@@ -282,15 +293,16 @@
             }
 
             function displayDatasets(datasets) {
-                tableify(datasets, '#show-datasets-table', 'show-datasets-table')
+                tableify(datasets, '#show-datasets-table-wrapper', 'show-datasets-table')
                 renderColumns('[name="show-datasets-table"]')
+                $('[name="show-datasets-table"]').DataTable();
             };
 
             displayDatasets(context.datasets);
             displayDatatypes(context.datatypes);
             selectify(context.sources, 'source', 'source', '#source');
 
-        })
-
+        })  
+    })
     </script>
 </html>

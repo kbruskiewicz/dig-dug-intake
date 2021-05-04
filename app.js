@@ -197,7 +197,7 @@ try {
             app.use('/', express.static('src/pages/'));
 
             // import scripts into a local path
-            app.use('/modules', express.static('node_modules/'));
+            app.use('/node_modules', express.static('/node_modules/'));
 
             // TODO: model page flow with state machine?
             // these endpoints rely on 'pages' being defined
@@ -323,7 +323,6 @@ try {
             // ensure session is used to check if authenticated and compatible with role
             // TODO: CSRF
             app.post('/do/query/datasets', async (req, res) => {
-                console.log(req.body, req.params)
                 const query = {
                     where: {
                         ...req.body,
