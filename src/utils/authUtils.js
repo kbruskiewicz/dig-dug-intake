@@ -1,3 +1,6 @@
+const config = require("../../config");
+const loadedConfig = config.loadConfig();
+
 const crypto = require("crypto");
 const model = require("./modelUtils");
 const LocalStrategy = require("passport-local").Strategy;
