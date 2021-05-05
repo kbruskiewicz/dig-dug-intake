@@ -13,7 +13,16 @@
         <link rel="stylesheet" href="index.css">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@exampledev/new.css@1/new.min.css">
         <link rel="stylesheet" href="https://fonts.xz.style/serve/inter.css">
-
+        
+        <style>
+            /* overriding datatables theme */
+            table.dataTable tbody tr {
+                background-color: var(--nc-bg-1);
+            }
+            .dataTables_wrapper .dataTables_length select {
+                background-color: #1a1a1a !important;
+            }
+        </style>
 
     </head>
  
@@ -148,7 +157,7 @@
 
             function tableify(arrayOfStructs, unique_element, name) {
                 const exclude = [
-                    ''
+                    'id'
                 ]
 
                 let fields = new Set();
