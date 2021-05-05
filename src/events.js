@@ -10,11 +10,12 @@ module.exports = {
             UPLOAD_SUCCESS: 'UPLOAD_SUCCESS',
             UPLOAD_ERROR: 'UPLOAD_ERROR',
             DOWNLOAD_START: 'DOWNLOAD_START',
-            DOWNLOAD_SUCCESS: 'UPLOAD_SUCCESS',
-            DOWNLOAD_ERROR: 'UPLOAD_ERROR',
+            DOWNLOAD_SUCCESS: 'DOWNLOAD_SUCCESS',
+            DOWNLOAD_ERROR: 'DOWNLOAD_ERROR',
         },
         accounts: {
-            REGISTERED: 'REGISTERED'
+            REGISTERED: 'REGISTERED',
+            REGISTERED_ADMIN: 'REGISTERED_ADMIN'
         }
     })
 }

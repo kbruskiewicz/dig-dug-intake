@@ -3,6 +3,7 @@
         <meta charset="utf8">
 
         <script src="https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lodash.pick@4.4.0/index.js"></script>
 
         <!-- <script src="https://cdn.jsdelivr.net/npm/jquery-bootgrid@1.3.1/dist/jquery.bootgrid.min.js"></script>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-bootgrid@1.3.1/dist/jquery.bootgrid.css"> -->
@@ -67,10 +68,24 @@
                 <!-- <input id="datatype" name="datatype" type="text"/><br> -->
                 <div id="datatype"></div>
                 <br>
-
+                
+                <!-- Genetic Data -->
                 <div class="datatype-1" hidden>
-                    
+                    <select>
+                        <option>GWAS</option>
+                        <option>Exome Array</option>
+                        <option>ImmunoChip</option>
+                        <option>WGS</option>
+                        <option>WES</option>
+                    </select>
+                    <select>
+                        <option>Individual</option>
+                        <option>Summary</option>
+                    </select>
+                    <div class="individual" hidden></div>
+                    <div class="summary" hidden></div>
                 </div>
+                <!-- Genomic Annotation -->
                 <div class="datatype-2" hidden>
                     
                 </div>
@@ -156,10 +171,15 @@
         ]).then(results => {
             const context = Object.fromEntries(results);
 
-            function tableify(arrayOfStructs, unique_element, name) {
-                const exclude = [
-                    'id'
-                ]
+            const exclude = [
+                    'id',
+                    'createdAt',
+                    'updatedAt',
+                    'user_id'
+            ]
+
+            function tableify(arrayOfStructs, unique_element, name, exclude_property=[]) {
+
 
                 let fields = new Set();
                 for (index in arrayOfStructs) {

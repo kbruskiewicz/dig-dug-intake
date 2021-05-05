@@ -175,7 +175,7 @@ try {
 
             if (!!username && !!password) {
                 
-                let test_user = await model.registerUser(username, password, name);
+                let test_user = await model.registerUser(username, password, name, loadedConfig.test.email, loadedConfig.test.role);
                 if (test_user) {
                     console.log(test_user.toJSON())
                 } else {
@@ -270,12 +270,18 @@ try {
                     const confirmation_token = '';
                     const confirm_link = `${loadedConfig.domain.host}/do/user/confirm?token=${confirmation_token}`;
 
-                    emailUtils.sendEmail(emailUtils.writeEmailOptions('REGISTERED', {
+                    // emailUtils.sendEmail(emailUtils.writeEmailOptions('REGISTERED', {
+                    //     name,
+                    //     username,
+                    //     // the parser can't handle keys with underscores
+                    //     confirmlink: confirm_link,
+                    // }), context.mail_transporter);
+
+                    emailUtils.sendRegisterConfirmationEmail({
                         name,
                         username,
-                        // the parser can't handle keys with underscores
-                        confirmlink: confirm_link,
-                    }), context.mail_transporter);
+                        confirmlink: confirm_link, // the parser can't handle keys with underscores
+                    }, context.mail_transporter)
 
                     return res.redirect('/');
 

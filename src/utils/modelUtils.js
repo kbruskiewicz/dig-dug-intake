@@ -78,7 +78,10 @@ function initEnumClass(sequelize, SequelizeModel, modelName, prop='name') {
 }
 
 function allOf(SequelizeModel) {
-    return async args => await SequelizeModel.findAll(args);
+    return async args => {
+        const datapoints = await SequelizeModel.findAll({ ...args, raw: true });
+        return datapoints;
+    };
 }
 
 class UserRole extends Model {}
@@ -127,7 +130,6 @@ User.init({
     }
 
 }, { sequelize, modelName: 'user' });
-UserRole.belongsTo(User);
 
 async function userExists(query) {
     return await User.findOne({ where: query })

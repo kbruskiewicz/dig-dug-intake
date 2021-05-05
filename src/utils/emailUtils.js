@@ -5,6 +5,8 @@ const fs = require('fs');
 const showdown = require("showdown");
 const csvParse = require('csv-parse/lib/sync');
 
+const model = require('./modelUtils');
+
 function makeConverter(content, contentFill) {
     function findTemplateTagsFromContent(content) {
         let regexp = /{{([A-Za-z]+)}}/g;
@@ -57,19 +59,19 @@ let contacts = csvParse(fs.readFileSync('contacts/contacts.csv', 'utf-8').toStri
     skip_empty_lines: true
 })
 
-function setEmailOptions(emailSubject, emailContent) {
+function getTo() {
+    return contacts.filter(contact => contact.role === 'researcher').map(contact => contact.email);
+}
+function getFrom() {
+    return contacts.filter(contact => contact.role === 'admin').map(contact => contact.email)[0];
+}
+
+function setEmailOptions(emailSubject, emailContent, contactsRecieving=getTo(), contactsSending=getFrom()) {
     let mailOptions = {}; 
 
-    function getTo() {
-        return contacts.filter(contact => contact.role === 'researcher').map(contact => contact.email);
-    }
-    function getFrom() {
-        return contacts.filter(contact => contact.role === 'admin').map(contact => contact.email)[0];
-    }
-
     // YAML Config?
-    mailOptions.to = getTo();   // TODO
-    mailOptions.from = getFrom(); // TODO
+    mailOptions.to = contactsRecieving;   // TODO
+    mailOptions.from = contactsSending; // TODO
     mailOptions.subject = emailSubject;
     mailOptions.html = emailContent;
 
@@ -97,16 +99,17 @@ function getEmailSubject(type) {
         [events.transfers.DOWNLOAD_ERROR]: `Error in download for dataset`,
         // user account emails
         [events.accounts.REGISTERED]: `Confirmation of registration`,
+        [events.accounts.REGISTERED_ADMIN]: `Confirmation new user registration`
     }
     return emailSubjects[type];
 }
 
-function writeEmailOptions(type, params) {
+function writeEmailOptions(type, contentFill, broadcastTo) {
     const emailTemplate = getEmail(type);
     if (emailTemplate !== '') {
-        const emailContent = getEmailBodyToHTML(emailTemplate, params);
+        const emailContent = getEmailBodyToHTML(emailTemplate, contentFill);
         const emailSubject = getEmailSubject(type);
-        const emailOptions = setEmailOptions(emailSubject, emailContent);
+        const emailOptions = setEmailOptions(emailSubject, emailContent, broadcastTo);
         return emailOptions;
     }
     return {};
@@ -147,8 +150,18 @@ async function sendEmail(emailOptions, transporter) {
     // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
 }
 
+async function sendRegisterConfirmationEmail(params, transporter) {
+    const administrators = await model.allUsers({ role: 'internal' });
+    const emails = administrators.map(administrator => administrator.email);
+    const emailOptions = writeEmailOptions('REGISTERED_ADMIN', params, emails);
+    console.log(administrators, emails, emailOptions)
+
+    return await sendEmail(emailOptions, transporter);
+}
+
 module.exports = {
     makeTestEmailTransporter,
     writeEmailOptions,
     sendEmail,
+    sendRegisterConfirmationEmail,
 }
