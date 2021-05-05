@@ -138,6 +138,10 @@
             const context = Object.fromEntries(results);
 
             function tableify(arrayOfStructs, unique_element, name) {
+                const exclude = [
+                    ''
+                ]
+
                 let fields = new Set();
                 for (index in arrayOfStructs) {
                     Object.keys(arrayOfStructs[index]).forEach(el => fields.add(el));
@@ -257,6 +261,14 @@
             }
 
             function selectify(arrayOfValues, target, name, unique_element) {
+                /*
+                <input type="radio" id="male" name="gender" value="male">
+                <label for="male">Male</label><br>
+                <input type="radio" id="female" name="gender" value="female">
+                <label for="female">Female</label><br>
+                <input type="radio" id="other" name="gender" value="other">
+                <label for="other">Other</label>
+                */
                 const select = document.createElement('select');
                 select.name = name;
                 arrayOfValues.forEach(optionValue => {
