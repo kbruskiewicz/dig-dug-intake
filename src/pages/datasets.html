@@ -127,7 +127,7 @@
             });
             document.getElementById('embargo_date').value = new Date().toDateInputValue();
 
-            datasets = fetch('/do/query/datasets', 
+            datasets = fetch('/do/query/datasets/all', 
                 { 
                     method: 'POST',
                     headers: {
@@ -147,7 +147,7 @@
                 .catch(console.warn);
         } else {
             console.warn('No user_id given on the datasets page!')
-            datasets = fetch('/do/query/datasets', 
+            datasets = fetch('/do/query/datasets/all', 
                 { 
                     method: 'POST',
                     headers: {
@@ -170,12 +170,13 @@
             possible_types.then(r => r.json()).then(j => ['datatypes', j])
         ]).then(results => {
             const context = Object.fromEntries(results);
-
+            // TODO
             const exclude = [
                     'id',
                     'createdAt',
                     'updatedAt',
-                    'user_id'
+                    'user_id',
+                    'visible'
             ]
 
             function tableify(arrayOfStructs, unique_element, name, exclude_property=[]) {
@@ -313,7 +314,6 @@
                 const select = document.createElement('select');
                 select.name = name;
                 arrayOfValues.forEach(optionValue => {
-                    console.log(optionValue)
                     const option = document.createElement('option');
                     option.value = optionValue.id;
                     option.appendChild(document.createTextNode(optionValue[target]));

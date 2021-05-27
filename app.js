@@ -3,6 +3,7 @@ const loadedConfig = config.loadConfig();
 
 // model
 const model = require("./src/utils/modelUtils");
+const aggregations = require("./src/utils/aggregations");
 
 // authentication
 const authUtils = require("./src/utils/authUtils");
@@ -303,7 +304,7 @@ try {
 
             // TODO: CSRF/JWT
             app.post('/do/datasets/register', async (req, res) => {
-                const accession_id = authUtils.shakeSalt(10);
+                const accession_id = `${req.body.name}_${authUtils.shakeSalt(5)}`;
                 const dataset = await model.registerDataset({ accession_id, ...req.body });
                 if (dataset) {
                     return res.redirect('/accession.html?accession_id='+accession_id)
@@ -325,6 +326,17 @@ try {
                 }
             });
 
+            app.get('/datasets/:userId/all', async (req, res) => {
+                // TODO: check if logged in user === userId!
+                // else unless the role is admin or the dataset is public, don't show
+                const datasets = await aggregation.DatasetEntryAggregation.collect({ user_id: req.params.userId });
+                if (datasets) {
+                    res.send(datasets)
+                } else {
+                    res.send(404)
+                }
+            });
+
             // TODO: use querystrings to find arbitrary datasets?
             // ensure session is used to check if authenticated and compatible with role
             // TODO: CSRF
@@ -337,6 +349,29 @@ try {
                 }
                 const datasets = await model.allDatasets(query);
                 console.log(datasets)
+                // TODO: filter by user permissions!
+                if (datasets) {
+                    res.send(datasets)
+                } else {
+                    res.send(404)
+                }
+            });
+
+            app.post('/do/query/datasets/all', async (req, res) => {
+                console.log('/do/query/datasets/all')
+                const query = {
+                    where: {
+                        ...req.body,
+                        visible: 1, // visibility access control? visible datasets only
+                    }
+                }
+
+                const datasets = await aggregations.DatasetEntryAggregation.collect()
+                    .then(a => a.flatMap(i=>i))
+                    .then(a => { console.log('tap', a); return a; })
+                    .then(a => a.map(model.helpers.excludeInternalProperties))
+                    .then(a => { console.log('tap', a); return a; });
+
                 // TODO: filter by user permissions!
                 if (datasets) {
                     res.send(datasets)
@@ -402,6 +437,13 @@ try {
             });
 
 
+            app.post('/do/file/upload/:upload_id/', async (req, res) => {
+
+            });
+
+            app.get('/do/file/upload/progress/:upload_id/', async (req, res) => {
+
+            });
 
             // INITIALIZE THE SERVER
             const port = loadedConfig.port;

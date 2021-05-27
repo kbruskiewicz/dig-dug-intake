@@ -3,7 +3,6 @@ const loadedConfig = config.loadConfig();
 
 const crypto = require("crypto");
 const model = require("./modelUtils");
-console.log(model)
 const LocalStrategy = require("passport-local").Strategy;
 const GoogleStrategy = require( 'passport-google-oauth20' ).Strategy;
 

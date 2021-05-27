@@ -168,7 +168,7 @@ initEnumClass(sequelize, DatasetType, 'dataset_type', 'type');
 
 
 class Dataset extends Model {}
-Dataset.init({
+const datasetSchema = {
     // database mechanics
     user_id: DataTypes.STRING,
     accession_id: {
@@ -196,13 +196,17 @@ Dataset.init({
         type: DataTypes.TEXT,
         defaultValue: ''
     },
-    
+    workflow: {
+            // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
+            type: DataTypes.STRING,
+            defaultValue: '', 
+    },
     source: {
         // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
         type: DataTypes.STRING,
         defaultValue: '',
     },
-    state: {
+    status: {
         // TODO: states - how to generate them programatically? => reference another table => convert to FKEYS
         type: DataTypes.STRING,
         defaultValue: '',
@@ -226,15 +230,16 @@ Dataset.init({
         defaultValue: 1,
     }
 
-}, { sequelize, modelName: 'datasets' })
+};
+Dataset.init(datasetSchema, { sequelize, modelName: 'datasets' })
 
-// this is a specially implemented call for getting datasets because they have specific visibility constraints
-// function allDatasets(query) {
-//     // going to restrict the datasets to only those considered globally visible?
-//     return async args => await Dataset.findAll(merge({ where: { visible: 1 }}), args);
-// }
+    // this is a specially implemented call for getting datasets because they have specific visibility constraints
+    // function allDatasets(query) {
+    //     // going to restrict the datasets to only those considered globally visible?
+    //     return async args => await Dataset.findAll(merge({ where: { visible: 1 }}), args);
+    // }
 
-async function registerDataset({ accession_id, user_id, name, institution, description, provider, principal_investigator, source, state, datatype, embargo_date }) {   
+async function registerDataset({ accession_id, user_id, name, institution, description, provider, principal_investigator, source, status, datatype, embargo_date }) {   
     const datasetExists = await Dataset.findOne({ where: { accession_id } }) !== null;
     if (!datasetExists) {
         const dataset = await Dataset.create({
@@ -247,15 +252,60 @@ async function registerDataset({ accession_id, user_id, name, institution, descr
             principal_investigator, 
             description, provider, 
             source,
-            state,
             datatype,
             embargo_date,
-            state: 0,  // all datasets are initialized in state 0
+            status: 0,  // all datasets are initialized in state 0
         });
         return dataset;
     } else {
         return null;
     }
+}
+
+// Our database schemas come with many "internal properties", like ID, user_id, createdAt, and updatedAt
+// Most users don't have to see this when the data is displayed, instead they're 
+// We document these internal properties so that they can be filtered or sampled later
+const _internalProperties = [
+    'id', 'user_id', 'createdAt', 'updatedAt', 
+    'visible',
+
+    'provider',
+    'principal_investigator',
+    'embargo_date',	
+];
+
+const excludeProperties = (properties) => (object) => {
+    let _object = object;
+    properties.forEach(property => {
+        _object[property] = undefined;
+    })
+    return _object;
+}
+
+const excludeInternalProperties = object => {
+    return excludeProperties(_internalProperties)(object)
+}
+
+// enrichWithProperties
+// * Used to ensure that an object has properties, even if they are null (NOT undefined)
+// * Works by creating an object with keys from a list initialized with empty values. 
+//   Then override all the empty values with full ones from a given object.
+const enrichWithProperties = properties => (object) => {
+    let propertyMap = properties.reduce((acc, property) => { acc[property] = null; return acc; }, {});
+    return {
+        ...propertyMap,
+        ...object,
+    }
+}
+
+// enrichWithInternalProperties
+// * Give an object that doesn't have all of the internal properties, internal properties.
+const enrichWithInternalProperties = object => {
+    return enrichWithProperties(_internalProperties)(object);
+}
+
+const enrichWithDatasetProperties = object => {
+    return enrichWithProperties(Object.keys(datasetSchema))(object);
 }
 
 module.exports = {
@@ -269,4 +319,12 @@ module.exports = {
     allDatasetSources: allOf(DatasetSource),
     allDatasetTypes: allOf(DatasetType),
     allDatasets: allOf(Dataset),
+    schemas: {
+        datasetSchema
+    },
+    helpers: {
+        excludeInternalProperties,
+        enrichWithInternalProperties,
+        enrichWithDatasetProperties,
+    }
 }
