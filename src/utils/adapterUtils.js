@@ -26,7 +26,7 @@ const schemaCheck = (properties) => (object) => {
     // Combine with keys of schema objects to make a schema-checking function (upto the property existence, excluding value types)
     // Useful for adapters/translating functions:
     // const isDatasetEntry = schemaCheck(Object.keys(model.schemas.datasetSchema));
-    // * isDatasetEntry({ accession_id, user_id, name, institution, principal_investigator, description, provider, source, state, datatype, embargo_date })    // PASS
+    // * isDatasetEntry({ accession_id, user_id, name, organization, principal_investigator, description, provider, source, state, datatype, embargo_date })    // PASS
 
     // TODO: ASSUMES ALL OPTIONAL PROPERTIES CONSUMED?
 
@@ -42,11 +42,11 @@ const schemaCheck = (properties) => (object) => {
 }
 
 // const isDatasetEntry = schemaCheck(Object.keys(model.schemas.datasetSchema))
-const isDatasetEntry = schemaCheck(['name', 'source', 'workflow', 'status', 'location', 'datatype', 'institution', 'description']);
+const isDatasetEntry = schemaCheck(['name', 'source', 'workflow', 'status', 'location', 'datatype', 'organization', 'description']);
 
 
 const dgaAnnotations = (filter) => fetch(
-    'http://www.diabetesepigenome.org:8080/getAnnotationRegistry', 
+    'http://www.diabetesepigenome.org:8080/getAnnotation', 
     { 
         method: "POST", 
         body: JSON.stringify({ type: 'Annotation' }) 
@@ -57,6 +57,7 @@ const dgaAnnotations = (filter) => fetch(
         const parsedResponse = Object.entries(responseBody)[0][1];
 
         const adapt = reshaper => objects => objects.map(reshaper);
+
         // TODO: it should be feasible to turn this into a spec driven construct?
         /*
         Consider a yaml file:
@@ -84,14 +85,12 @@ const dgaAnnotations = (filter) => fetch(
         We could be even more presumptive about how we parse the configuration to make it more terse:
 
         ```yaml
-        # in the file, root keys are schemas
-        dataset_entry:
-            # child keys are remote datasource names
-            dga_annotations:
+       
+        dataset_entry:                                    # in the file, root keys are schemas                            
+            dga_annotations:                              # child keys are remote datasource names
                 url: 'http://www.diabetesepigenome.org:8080/getAnnotationRegistry'
                 body: 
-                    # treated as keys in JSON body
-                    type: 'Annotation'
+                    type: 'Annotation'                    # treated as keys in JSON body
                 translate:
                     workflow: 'underlying_assay'
                     accession_id: 'annotation_id'
@@ -112,21 +111,22 @@ const dgaAnnotations = (filter) => fetch(
         const datasetEntries = adapt(o => isDatasetEntry({
             accession_id: o.annotation_id,
             name: `${o.portal_tissue_id}`,
+            organization: 'DGA',
             description: `${o.portal_tissue}`,
             source: o.annotation_source,
             workflow: `${o.underlying_assay}`,   // TODO: array value? turn into string
             status: o.dataset_status,       // TODO: map into our own status codes for dataset status?
-            location: `diabetesgenome.org`,                // TODO: how to link into DGA resource to see the result?
             datatype: 'annotation',
-            institution: 'DGA',
+            location: `diabetesgenome.org`,                // TODO: how to link into DGA resource to see the result?
             principal_investigator: o.lab,
             visible: 1 // truthy, if we're seeing it here we're supposed to see it because the datasource is public
         }))(parsedResponse);  
-        
+
         return datasetEntries;
 
     }).then(entries => entries.filter(entry => {
-        return Object.entries(filter).every(filterEntry => {
+        // console.log(filter)
+        return Object.entries(filter.where).every(filterEntry => {
             const [key, value] = filterEntry;
             return entry[key] === value;
         })

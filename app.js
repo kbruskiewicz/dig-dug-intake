@@ -79,7 +79,7 @@ const googleStrategyImpl = new GoogleStrategy({
     // callbackURL: `http://${loadedConfig.auth.google.callbackHost}`
   },
   function(accessToken, refreshToken, profile, cb) {
-        console.log(profile)
+        // console.log(profile)
         // User.findOrCreate({ googleId: profile.id }, function (err, user) {
         //     return cb(err, user);
         // });
@@ -134,11 +134,11 @@ try {
                     html: "<b>Hello world?</b>", // html body
                 });
 
-                console.log("Message sent: %s", info.messageId);
+                // console.log("Message sent: %s", info.messageId);
                 // Message sent: <b658f8ca-6296-ccf4-8306-87d57a0b4321@example.com>
 
                 // Preview only available when sending through an Ethereal account
-                console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+                // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
                 // Preview URL: https://ethereal.email/message/WaQKMgKddxQDoou...
 
             } else {
@@ -173,10 +173,13 @@ try {
             const username = loadedConfig.test.username;
             const password = loadedConfig.test.password;
             const name = loadedConfig.test.name;
+            const email = loadedConfig.test.email;
+            const role = loadedConfig.test.role;
+            const organization = loadedConfig.test.organization;
 
             if (!!username && !!password) {
                 
-                let test_user = await model.registerUser(username, password, name, loadedConfig.test.email, loadedConfig.test.role);
+                let test_user = await model.registerUser({username, password, name, email, role, organization});
                 if (test_user) {
                     console.log(test_user.toJSON())
                 } else {
@@ -263,8 +266,8 @@ try {
             // DONE
                 // except... sending encrypted password over wire on clientside
             app.post('/do/user/register', async (req, res) => {
-                const { username, password, email, role, name } = req.body;
-                const user = await model.registerUser(username, password, name, email, role);
+                const { username, password, email, role, name, organization } = req.body;
+                const user = await model.registerUser({ username, password, name, email, role, organization });
                 if (user !== null) {
 
                     // TODO: generate registration token & confirm link
@@ -304,13 +307,29 @@ try {
 
             // TODO: CSRF/JWT
             app.post('/do/datasets/register', async (req, res) => {
-                const accession_id = `${req.body.name}_${authUtils.shakeSalt(5)}`;
-                const dataset = await model.registerDataset({ accession_id, ...req.body });
+                
+                // This will return in one line
+                const makeAccessionId =  (name, len=25) => `${
+                    // the order of the following operations matters
+                    new String(name)
+                        .substr(0, len)
+                        .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g,"")  // remove all common punctuation characters except for underscore
+                        .replace(/ /g, '_')
+                        .toUpperCase()
+                }_${authUtils.shakeSalt(3)}`;
+                
+                const accession_id = makeAccessionId(req.body.name);
+                
+                const dataset = await model.registerDataset({ 
+                    accession_id, 
+                    ...req.body 
+                });
                 if (dataset) {
                     return res.redirect('/accession.html?accession_id='+accession_id)
                 } else {
                     return res.send(500);
                 }
+
             });
             
             // TODO: gets datasets => post or query params?
@@ -329,11 +348,19 @@ try {
             app.get('/datasets/:userId/all', async (req, res) => {
                 // TODO: check if logged in user === userId!
                 // else unless the role is admin or the dataset is public, don't show
-                const datasets = await aggregation.DatasetEntryAggregation.collect({ user_id: req.params.userId });
-                if (datasets) {
-                    res.send(datasets)
+                const user = await model.userExists({ id: req.params.userId })
+                if (user) {
+                    const datasets = await aggregation.DatasetEntryAggregation.collect({ 
+                        user_id: req.params.userId,
+                        // organization: results.dataValues.organization
+                    });
+                    if (datasets) {
+                        res.send(datasets)
+                    } else {
+                        res.send(404)
+                    }
                 } else {
-                    res.send(404)
+                    res.send(403)
                 }
             });
 
@@ -348,7 +375,6 @@ try {
                     }
                 }
                 const datasets = await model.allDatasets(query);
-                console.log(datasets)
                 // TODO: filter by user permissions!
                 if (datasets) {
                     res.send(datasets)
@@ -358,7 +384,7 @@ try {
             });
 
             app.post('/do/query/datasets/all', async (req, res) => {
-                console.log('/do/query/datasets/all')
+                console.log(req.body)
                 const query = {
                     where: {
                         ...req.body,
@@ -366,11 +392,11 @@ try {
                     }
                 }
 
-                const datasets = await aggregations.DatasetEntryAggregation.collect()
+                const datasets = await aggregations.DatasetEntryAggregation.collect(query)
                     .then(a => a.flatMap(i=>i))
-                    .then(a => { console.log('tap', a); return a; })
+                    // .then(a => { console.log('tap', a); return a; })
                     .then(a => a.map(model.helpers.excludeInternalProperties))
-                    .then(a => { console.log('tap', a); return a; });
+                    // .then(a => { console.log('tap', a); return a; });
 
                 // TODO: filter by user permissions!
                 if (datasets) {
@@ -424,6 +450,15 @@ try {
                 const results = await model.userExists({ id: req.params.userId })
                 if (results) {
                     res.send(JSON.stringify(results.dataValues.name));    
+                } else {
+                    res.send({});
+                }
+            });
+            // TODO: CSRF
+            app.get('/users/:userId/organization', async (req, res) => {
+                const results = await model.userExists({ id: req.params.userId })
+                if (results) {
+                    res.send(JSON.stringify(results.dataValues.organization));    
                 } else {
                     res.send({});
                 }

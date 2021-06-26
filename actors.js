@@ -10,7 +10,7 @@ const system = start();
 const mailer = spawnStateless(
     system,
     async (msg, ctx) => {
-        console.log(`Hello from email with ${msg.status}`)
+        // console.log(`Hello from email with ${msg.status}`)
         const emailOptions = writeEmailOptions(msg.status, msg.params);
         await sendEmail(emailOptions).catch(console.error);
     },
@@ -20,7 +20,7 @@ const mailer = spawnStateless(
 const logger = spawnStateless(
     system,
     async (msg, ctx) => {
-        console.log(`Hello from logger with ${msg.status}`)
+        // console.log(`Hello from logger with ${msg.status}`)
         // TODO: map to stdout/redis?
         // TODO: parse structure?
         // Logger.info
@@ -54,7 +54,7 @@ const broker = spawnStateless(
     system,
     async (msg, ctx) => {
         
-        console.log(`Hello from broker with ${msg.status}`)
+        // console.log(`Hello from broker with ${msg.status}`)
         // put -> create or update a dataset upload request with new state change
         await putDatasetUploadRequestStatusChange(msg.status, msg.params).catch(console.error);
         // get the resulting dataset request that fulfilled the params provided

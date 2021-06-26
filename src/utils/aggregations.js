@@ -52,8 +52,10 @@ class Aggregation {
 
     // TODO: Do we want to access the individual results of the aggregation, 
     //  to increase predictability?
+    // TODO: Do we want to keep track of metadata or registration data
     // Use the "identity" element, make collect push results into entries?
-    bind(callback, identity=this.#functions.length) {
+    // Use metadata for filtering the collection?
+    bind(callback, identity=this.#functions.length, metadata={}) {
         this.#functions.push(callback);
         return this;
     }
@@ -64,7 +66,7 @@ class Aggregation {
             return Promise.all(
                 this.#functions.map(
                     // TODO: liftable?
-                    async f => f(query).then(aos => aos.every(this.#schemaCheck) ? aos : [])
+                    async f => f(query).then(aos => aos.every(this.#schemaCheck) ? aos : []).catch(e => { console.error(e); return [] })
                 )
             )
         } else {

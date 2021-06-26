@@ -27,13 +27,18 @@
             <input id="email" name="email" type="email"/><br>
             <br>
 
+            <label for="organization">Organization</label><br>
+            <input id="organization" name="organization" type="text"/><br>
+            <br>
+
             <!-- TODO: use the API to populate this control -->
             <!-- TODO: run with svelte? -->
             <!-- TODO: Not available? -->
             <label for="role">Role</label><br>
             <select name="role" id="role">
-                <option value="0" disabled hidden>Internal</option>
-                <option value="1">Uploader</option>
+                <!-- TODO: controlled vocabulary -->
+                <option value="internal" disabled hidden>Internal</option>
+                <option value="uploader">Uploader</option>
             </select><br>
             <br>
 

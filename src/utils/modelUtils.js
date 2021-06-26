@@ -118,6 +118,10 @@ User.init({
         type: DataTypes.ENUM(''),
         defaultValue: '',
     },
+    organization: {
+        type: DataTypes.STRING,
+        defaultValue: ''
+    },
 
     // useful metadata
     googleId: {
@@ -135,13 +139,14 @@ async function userExists(query) {
     return await User.findOne({ where: query })
 }
 
-async function registerUser(username, password, name, email, role, salt=authUtils.shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation) {
+async function registerUser({ username, password, name, email, role, organization, salt=authUtils.shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation }) {
     // TODO: guarantee that user IDs are UUIDs
     // should be generated in SQL
     if (!(await userExists({ username }))) {
         const user = await User.create({
-            username: username,
-            name: name,
+            username,
+            name,
+            organization,
             password_salt: salt,
             password_hash: authUtils.obscurePassword(password, hash_function, salt),
             hash_function: hash_function,
@@ -175,12 +180,11 @@ const datasetSchema = {
         type: DataTypes.STRING,
         defaultValue: '',
     },
-    
     name: {
         type: DataTypes.STRING,
         defaultValue: '',
     },
-    institution: {
+    organization: {
         type: DataTypes.STRING,
         defaultValue: '',
     },
@@ -233,14 +237,15 @@ const datasetSchema = {
 };
 Dataset.init(datasetSchema, { sequelize, modelName: 'datasets' })
 
-    // this is a specially implemented call for getting datasets because they have specific visibility constraints
-    // function allDatasets(query) {
-    //     // going to restrict the datasets to only those considered globally visible?
-    //     return async args => await Dataset.findAll(merge({ where: { visible: 1 }}), args);
-    // }
+// this is a specially implemented call for getting datasets because they have specific visibility constraints
+// function allDatasets(query) {
+//     // going to restrict the datasets to only those considered globally visible?
+//     return async args => await Dataset.findAll(merge({ where: { visible: 1 }}), args);
+// }
 
-async function registerDataset({ accession_id, user_id, name, institution, description, provider, principal_investigator, source, status, datatype, embargo_date }) {   
+async function registerDataset({ accession_id, user_id, name, organization, description, provider, principal_investigator, source, status, datatype, embargo_date }) {   
     const datasetExists = await Dataset.findOne({ where: { accession_id } }) !== null;
+    const initialDatasetStatus = await (await DatasetState.findOne({ where: { id: 0 }})).getDataValue('state');
     if (!datasetExists) {
         const dataset = await Dataset.create({
             accession_id,
@@ -248,13 +253,13 @@ async function registerDataset({ accession_id, user_id, name, institution, descr
             // accessions should either be generated here or within SQL
             // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
             name,
-            institution,
+            organization,
             principal_investigator, 
             description, provider, 
             source,
             datatype,
             embargo_date,
-            status: 0,  // all datasets are initialized in state 0
+            status: initialDatasetStatus,  // all datasets are initialized in state 0
         });
         return dataset;
     } else {
@@ -265,9 +270,11 @@ async function registerDataset({ accession_id, user_id, name, institution, descr
 // Our database schemas come with many "internal properties", like ID, user_id, createdAt, and updatedAt
 // Most users don't have to see this when the data is displayed, instead they're 
 // We document these internal properties so that they can be filtered or sampled later
+// TODO: these need to be abstracted somewhere, no good living here
+//       could suggest a schema split in the model
+//       or use of document database
 const _internalProperties = [
-    'id', 'user_id', 'createdAt', 'updatedAt', 
-    'visible',
+    'id', 'user_id', 'createdAt', 'updatedAt', 'visible',
 
     'provider',
     'principal_investigator',

@@ -25,6 +25,7 @@ test:
   username: 'janedoe'
   password: 'janedoe'
   name: 'Jane Doe'
+  organization: 'Broad Institute'
 auth:
   google:
       secretId: heYzX5OtHM5j8xCsGuYWj1k6
@@ -36,3 +37,7 @@ auth:
 https:
   key: './sslcert/selfsigned.key'
   cert: './sslcert/selfsigned.crt'
+policy:
+  DGA:
+  - "DGA"
+  - "Broad"
