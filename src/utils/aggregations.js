@@ -1,4 +1,3 @@
-
 const adapterUtils = require('./adapterUtils')
 const modelUtils = require('./modelUtils')
 
@@ -44,9 +43,9 @@ class Aggregation {
     #functions
     #query
 
-    constructor(schemaCheck=id=>id, query={}, functions=[]) {
-        this.#schemaCheck=schemaCheck;
-        this.#functions=functions;
+    constructor(schemaCheck = id => id, query = {}, functions = []) {
+        this.#schemaCheck = schemaCheck;
+        this.#functions = functions;
         this.#query = query;
     }
 
@@ -55,18 +54,21 @@ class Aggregation {
     // TODO: Do we want to keep track of metadata or registration data
     // Use the "identity" element, make collect push results into entries?
     // Use metadata for filtering the collection?
-    bind(callback, identity=this.#functions.length, metadata={}) {
+    bind(callback, identity = this.#functions.length, metadata = {}) {
         this.#functions.push(callback);
         return this;
     }
 
     // TODO: IO protection
-    async collect(query=this.#query) {
+    async collect(query = this.#query) {
         if (this.#functions.length > 0) {
             return Promise.all(
                 this.#functions.map(
                     // TODO: liftable?
-                    async f => f(query).then(aos => aos.every(this.#schemaCheck) ? aos : []).catch(e => { console.error(e); return [] })
+                    async f => {
+                        console.log(f, f(query))
+                        return f(query).then(aos => aos.every(this.#schemaCheck) ? aos : []).catch(e => { console.error(e); return [] })
+                    }
                 )
             )
         } else {
@@ -79,8 +81,9 @@ class Aggregation {
 
 const DatasetEntryAggregation = new Aggregation(adapterUtils.isDatasetEntry)
 DatasetEntryAggregation
-    .bind(adapterUtils.dgaAnnotations)
-    .bind(modelUtils.allDatasets)
+    //.bind(adapterUtils.dgaAnnotations)
+    .bind(adapterUtils.oldDataAdapter)
+    //.bind(modelUtils.allDatasets)
 
 // Test
 // DatasetEntryAggregator.collect().then(a => a.flatMap(id=>id)).then(console.log)

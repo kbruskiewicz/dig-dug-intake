@@ -9,7 +9,7 @@ const aggregations = require("./src/utils/aggregations");
 const authUtils = require("./src/utils/authUtils");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-const GoogleStrategy = require( 'passport-google-oauth20' ).Strategy;
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const flash = require("connect-flash");
 
 // emails
@@ -17,7 +17,7 @@ const nodemailer = require("nodemailer");
 const emailUtils = require("./src/utils/emailUtils")
 
 // https
-const fs = require("fs");  // will be used to read key and cert files
+const fs = require("fs"); // will be used to read key and cert files
 const https = require("https");
 
 const express = require("express");
@@ -53,9 +53,9 @@ app.use(flash());
 const localStrategyImpl = new LocalStrategy(
     async function(username, password, done) {
         const user = await model.userExists({ username });
-        const authenticate = function(err=null, user) {
+        const authenticate = function(err = null, user) {
             if (err) { return done(err); }
-            
+
             if (!user) {
                 return done('nouser', false, { message: 'Incorrect username.' });
             }
@@ -74,16 +74,16 @@ const localStrategyImpl = new LocalStrategy(
 
 // TODO: google login
 const googleStrategyImpl = new GoogleStrategy({
-    clientID: loadedConfig.auth.google.clientId,
-    clientSecret: loadedConfig.auth.google.secretId,
-    // callbackURL: `http://${loadedConfig.auth.google.callbackHost}`
-  },
-  function(accessToken, refreshToken, profile, cb) {
+        clientID: loadedConfig.auth.google.clientId,
+        clientSecret: loadedConfig.auth.google.secretId,
+        // callbackURL: `http://${loadedConfig.auth.google.callbackHost}`
+    },
+    function(accessToken, refreshToken, profile, cb) {
         // console.log(profile)
         // User.findOrCreate({ googleId: profile.id }, function (err, user) {
         //     return cb(err, user);
         // });
-  }
+    }
 )
 
 // END LOGIN STRATEGIES //
@@ -95,8 +95,8 @@ passport.serializeUser((user, done) => {
     done(null, user.id);
 });
 
-passport.deserializeUser(async (id, done) => {
-    const user = await model.userExists({ id });    
+passport.deserializeUser(async(id, done) => {
+    const user = await model.userExists({ id });
     done(null, user);
 });
 // END: AUTHENTICATION CONFIGURATION
@@ -107,7 +107,7 @@ passport.deserializeUser(async (id, done) => {
 try {
     // initialize database and database connection
     // synchronize model with database
-    model.initDB().sync()
+    model.initDB(loadedConfig.db.rebuild).sync()
         // create a "context" object to be passed through the promise chain
         // lets us segregate out resource initializations (like DB, email) into different steps
         .then(() => {
@@ -159,7 +159,7 @@ try {
             if (!!mail_transporter) {
                 _context['mail_transporter'] = mail_transporter;
             }
-            
+
             return _context;
         })
         .then(async context => {
@@ -178,10 +178,10 @@ try {
             const organization = loadedConfig.test.organization;
 
             if (!!username && !!password) {
-                
-                let test_user = await model.registerUser({username, password, name, email, role, organization});
+
+                let test_user = await model.registerUser({ username, password, name, email, role, organization });
                 if (test_user) {
-                    console.log(test_user.toJSON())
+                    console.log(username, 'initialized')
                 } else {
                     console.log(username, 'already exists')
                 }
@@ -196,7 +196,7 @@ try {
 
         })
         .then(async context => {
-            
+
             // import html pages to be visible in the application
             app.use('/', express.static('src/pages/'));
 
@@ -228,44 +228,43 @@ try {
             // initializeControllers(app);
             // TODO: CSRF    
             app.post('/do/user/login', function(req, res, next) {
-                    if (req.body.action === 'Login') {
-                        passport.authenticate('local', function(err, user, info) {
-                            if (err || !user) {  
-                                // TODO: refactor to enum
-                                if (err === 'nouser') {
-                                    // TODO: populate form with defaults?
-                                    // conditional redirect:
-                                    // username exists => password is wrong
-                                    // username does not exist => register (or prompt register)
-                                    return res.redirect('/register.html');
-                                } else if (err === 'nopassword') {
-                                    // TODO: populate form with defaults?
-                                    // conditional redirect:
-                                    // username exists => password is wrong
-                                    // username does not exist => register (or prompt register)
-                                    return res.redirect('/index.html');
-                                }
-                                return next(err)
+                if (req.body.action === 'Login') {
+                    passport.authenticate('local', function(err, user, info) {
+                        if (err || !user) {
+                            // TODO: refactor to enum
+                            if (err === 'nouser') {
+                                // TODO: populate form with defaults?
+                                // conditional redirect:
+                                // username exists => password is wrong
+                                // username does not exist => register (or prompt register)
+                                return res.redirect('/register.html');
+                            } else if (err === 'nopassword') {
+                                // TODO: populate form with defaults?
+                                // conditional redirect:
+                                // username exists => password is wrong
+                                // username does not exist => register (or prompt register)
+                                return res.redirect('/index.html');
                             }
-                            req.logIn(user, function(err) {
-                                if (err) { 
-                                    return next(err); 
-                                }
-                                return res.redirect('/datasets.html?user=' + user.id);
-                            });
-                        })(req, res, next)
-                    } else if (req.body.action === 'Register') {
-                        return res.redirect('/register.html');
-                    }    
+                            return next(err)
+                        }
+                        req.logIn(user, function(err) {
+                            if (err) {
+                                return next(err);
+                            }
+                            return res.redirect('/datasets.html?user=' + user.id);
+                        });
+                    })(req, res, next)
+                } else if (req.body.action === 'Register') {
+                    return res.redirect('/register.html');
                 }
-            );
-            
+            });
+
             // TODO: CSRF
             app.post('/do/user/login/google', passport.authenticate('google', { scope: ['profile'] }));
 
             // DONE
-                // except... sending encrypted password over wire on clientside
-            app.post('/do/user/register', async (req, res) => {
+            // except... sending encrypted password over wire on clientside
+            app.post('/do/user/register', async(req, res) => {
                 const { username, password, email, role, name, organization } = req.body;
                 const user = await model.registerUser({ username, password, name, email, role, organization });
                 if (user !== null) {
@@ -290,13 +289,13 @@ try {
                     return res.redirect('/');
 
                 } else {
-                    
+
                     return res.send(304);
 
                 }
             });
 
-            app.post('/do/user/confirm', async (req, res) => {
+            app.post('/do/user/confirm', async(req, res) => {
                 const confirm = null;
                 if (confirm !== null) {
                     return res.send(200)
@@ -306,35 +305,29 @@ try {
             });
 
             // TODO: CSRF/JWT
-            app.post('/do/datasets/register', async (req, res) => {
-                
-                // This will return in one line
-                const makeAccessionId =  (name, len=25) => `${
-                    // the order of the following operations matters
-                    new String(name)
-                        .substr(0, len)
-                        .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g,"")  // remove all common punctuation characters except for underscore
-                        .replace(/ /g, '_')
-                        .toUpperCase()
-                }_${authUtils.shakeSalt(3)}`;
-                
+            app.post('/do/datasets/register', async(req, res) => {
+                const string = new String(name)
+                    .substr(0, len)
+                    .replace(/[.,\/#!$%\^&\*;:{}=\-`~()]/g, "") // remove all common punctuation characters except for underscore
+                    .replace(/ /g, '_')
+                    .toUpperCase()
+                    // This will return in one line
+                const makeAccessionId = (name, len = 25) => `${string}_${ authUtils.shakeSalt(3) }`;
                 const accession_id = makeAccessionId(req.body.name);
-                
-                const dataset = await model.registerDataset({ 
-                    accession_id, 
-                    ...req.body 
+                const dataset = await model.registerDataset({
+                    accession_id,
+                    ...req.body
                 });
                 if (dataset) {
-                    return res.redirect('/accession.html?accession_id='+accession_id)
+                    return res.redirect('/accession.html?accession_id=' + accession_id)
                 } else {
                     return res.send(500);
                 }
-
             });
-            
+
             // TODO: gets datasets => post or query params?
             // TODO: CSRF
-            app.get('/datasets/:userId', async (req, res) => {
+            app.get('/datasets/:userId', async(req, res) => {
                 // TODO: check if logged in user === userId!
                 // else unless the role is admin or the dataset is public, don't show
                 const datasets = await model.allDatasets({ user_id: req.params.userId });
@@ -345,12 +338,12 @@ try {
                 }
             });
 
-            app.get('/datasets/:userId/all', async (req, res) => {
+            app.get('/datasets/:userId/all', async(req, res) => {
                 // TODO: check if logged in user === userId!
                 // else unless the role is admin or the dataset is public, don't show
                 const user = await model.userExists({ id: req.params.userId })
                 if (user) {
-                    const datasets = await aggregation.DatasetEntryAggregation.collect({ 
+                    const datasets = await aggregation.DatasetEntryAggregation.collect({
                         user_id: req.params.userId,
                         // organization: results.dataValues.organization
                     });
@@ -367,7 +360,7 @@ try {
             // TODO: use querystrings to find arbitrary datasets?
             // ensure session is used to check if authenticated and compatible with role
             // TODO: CSRF
-            app.post('/do/query/datasets', async (req, res) => {
+            app.post('/do/query/datasets', async(req, res) => {
                 const query = {
                     where: {
                         ...req.body,
@@ -383,7 +376,7 @@ try {
                 }
             });
 
-            app.post('/do/query/datasets/all', async (req, res) => {
+            app.post('/do/query/datasets/all', async(req, res) => {
                 console.log(req.body)
                 const query = {
                     where: {
@@ -393,7 +386,7 @@ try {
                 }
 
                 const datasets = await aggregations.DatasetEntryAggregation.collect(query)
-                    .then(a => a.flatMap(i=>i))
+                    .then(a => a.flatMap(i => i))
                     // .then(a => { console.log('tap', a); return a; })
                     .then(a => a.map(model.helpers.excludeInternalProperties))
                     // .then(a => { console.log('tap', a); return a; });
@@ -408,7 +401,7 @@ try {
 
             // enum endpoints
             // TODO: CSRF
-            app.get('/do/query/datasets/states', async (req, res) => {
+            app.get('/do/query/datasets/states', async(req, res) => {
                 const results = await model.allDatasetStates({ raw: true });
                 if (results) {
                     res.setHeader('Content-Type', 'application/json');
@@ -419,7 +412,7 @@ try {
 
             });
             // TODO: CSRF
-            app.get('/do/query/datasets/datatypes', async (req, res) => {
+            app.get('/do/query/datasets/datatypes', async(req, res) => {
                 const results = await model.allDatasetTypes({ raw: true });
                 if (results) {
                     res.send(results);
@@ -428,7 +421,7 @@ try {
                 }
             });
             // TODO: CSRF
-            app.get('/do/query/datasets/sources', async (req, res) => {
+            app.get('/do/query/datasets/sources', async(req, res) => {
                 const results = await model.allDatasetSources({ raw: true });
                 if (results) {
                     res.send(results);
@@ -437,46 +430,46 @@ try {
                 }
             });
             // TODO: CSRF
-            app.get('/users/:userId/username', async (req, res) => {
+            app.get('/users/:userId/username', async(req, res) => {
                 const results = await model.userExists({ id: req.params.userId })
                 if (results) {
-                    res.send(JSON.stringify(results.dataValues.username));    
+                    res.send(JSON.stringify(results.dataValues.username));
                 } else {
                     res.send({});
                 }
             });
             // TODO: CSRF
-            app.get('/users/:userId/name', async (req, res) => {
+            app.get('/users/:userId/name', async(req, res) => {
                 const results = await model.userExists({ id: req.params.userId })
                 if (results) {
-                    res.send(JSON.stringify(results.dataValues.name));    
+                    res.send(JSON.stringify(results.dataValues.name));
                 } else {
                     res.send({});
                 }
             });
             // TODO: CSRF
-            app.get('/users/:userId/organization', async (req, res) => {
+            app.get('/users/:userId/organization', async(req, res) => {
                 const results = await model.userExists({ id: req.params.userId })
                 if (results) {
-                    res.send(JSON.stringify(results.dataValues.organization));    
+                    res.send(JSON.stringify(results.dataValues.organization));
                 } else {
                     res.send({});
                 }
             });
 
             // TODO: CSRF
-            app.get('/users/roles/', async (req, res) => {
+            app.get('/users/roles/', async(req, res) => {
                 const results = await model.allUserRoles();
                 res.setHeader('Content-Type', 'application/json');
                 res.send(JSON.stringify(results));
             });
 
 
-            app.post('/do/file/upload/:upload_id/', async (req, res) => {
+            app.post('/do/file/upload/:upload_id/', async(req, res) => {
 
             });
 
-            app.get('/do/file/upload/progress/:upload_id/', async (req, res) => {
+            app.get('/do/file/upload/progress/:upload_id/', async(req, res) => {
 
             });
 
@@ -488,14 +481,9 @@ try {
             }, app).listen(port, () => {
                 console.log('[HTTPS] App started on port:', port)
             })
-            
-        
-    })
-} catch(error) {
+
+
+        })
+} catch (error) {
     console.error(error)
 }
-
-
-
-
-

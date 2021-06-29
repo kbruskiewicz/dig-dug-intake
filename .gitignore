@@ -31,3 +31,6 @@ pnpm-debug.log*
 
 # config
 config.yml
+
+# data loading
+src/data/

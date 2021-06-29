@@ -7,7 +7,16 @@ const { events } = require('../events');
 const { Sequelize, Model, DataTypes } = require('sequelize');
 
 let sequelize = null;
-function initDB() {
+
+function initDB(rebuild = false) {
+    if (rebuild) {
+        User.sync({ force: true })
+        UserRole.sync({ force: true })
+        DatasetState.sync({ force: true })
+        DatasetSource.sync({ force: true })
+        DatasetType.sync({ force: true })
+        Dataset.sync({ force: true })
+    }
     if (loadedConfig.db.host === 'sqlite::memory:') {
         sequelize = new Sequelize(loadedConfig.db.host, {
             logging: console.log
@@ -73,13 +82,15 @@ initDB();
 // }
 
 // an enum class
-function initEnumClass(sequelize, SequelizeModel, modelName, prop='name') {
-    SequelizeModel.init({ [prop]: { type: DataTypes.STRING, defaultValue: '' } }, { sequelize, modelName, timestamps: false })
+function initEnumClass(sequelize, SequelizeModel, modelName, prop = 'name') {
+    SequelizeModel.init({
+        [prop]: { type: DataTypes.STRING, defaultValue: '' }
+    }, { sequelize, modelName, timestamps: false })
 }
 
 function allOf(SequelizeModel) {
     return async args => {
-        const datapoints = await SequelizeModel.findAll({ ...args, raw: true });
+        const datapoints = await SequelizeModel.findAll({...args, raw: true });
         return datapoints;
     };
 }
@@ -110,7 +121,7 @@ User.init({
     email: {
         type: DataTypes.STRING,
         validate: {
-            isEmail: true,            // checks for email format (foo@bar.com)
+            isEmail: true, // checks for email format (foo@bar.com)
         }
     },
     role: {
@@ -133,13 +144,13 @@ User.init({
         defaultValue: true,
     }
 
-}, { sequelize, modelName: 'user' });
+}, { sequelize, modelName: 'user', timestamps: false });
 
 async function userExists(query) {
     return await User.findOne({ where: query })
 }
 
-async function registerUser({ username, password, name, email, role, organization, salt=authUtils.shakeSalt(), hash_function=loadedConfig.crypto.hash_implementation }) {
+async function registerUser({ username, password, name, email, role, organization, salt = authUtils.shakeSalt(), hash_function = loadedConfig.crypto.hash_implementation }) {
     // TODO: guarantee that user IDs are UUIDs
     // should be generated in SQL
     if (!(await userExists({ username }))) {
@@ -201,9 +212,9 @@ const datasetSchema = {
         defaultValue: ''
     },
     workflow: {
-            // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
-            type: DataTypes.STRING,
-            defaultValue: '', 
+        // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
+        type: DataTypes.STRING,
+        defaultValue: '',
     },
     source: {
         // TODO: sources - how to generate them programatically? => reference another table => convert to FKEYS
@@ -230,12 +241,12 @@ const datasetSchema = {
     },
 
     visible: {
-        type: DataTypes.NUMBER,
+        type: DataTypes.INTEGER,
         defaultValue: 1,
     }
 
 };
-Dataset.init(datasetSchema, { sequelize, modelName: 'datasets' })
+Dataset.init(datasetSchema, { sequelize, modelName: 'datasets', timestamps: false })
 
 // this is a specially implemented call for getting datasets because they have specific visibility constraints
 // function allDatasets(query) {
@@ -243,9 +254,9 @@ Dataset.init(datasetSchema, { sequelize, modelName: 'datasets' })
 //     return async args => await Dataset.findAll(merge({ where: { visible: 1 }}), args);
 // }
 
-async function registerDataset({ accession_id, user_id, name, organization, description, provider, principal_investigator, source, status, datatype, embargo_date }) {   
+async function registerDataset({ accession_id, user_id, name, organization, description, provider, principal_investigator, source, status, datatype, embargo_date }) {
     const datasetExists = await Dataset.findOne({ where: { accession_id } }) !== null;
-    const initialDatasetStatus = await (await DatasetState.findOne({ where: { id: 0 }})).getDataValue('state');
+    const initialDatasetStatus = await (await DatasetState.findOne({ where: { id: 0 } })).getDataValue('state');
     if (!datasetExists) {
         const dataset = await Dataset.create({
             accession_id,
@@ -254,12 +265,13 @@ async function registerDataset({ accession_id, user_id, name, organization, desc
             // only constraint is that it must be a file-system compatible string (SO: keep it alphanumeric)
             name,
             organization,
-            principal_investigator, 
-            description, provider, 
+            principal_investigator,
+            description,
+            provider,
             source,
             datatype,
             embargo_date,
-            status: initialDatasetStatus,  // all datasets are initialized in state 0
+            status: initialDatasetStatus, // all datasets are initialized in state 0
         });
         return dataset;
     } else {
@@ -278,7 +290,7 @@ const _internalProperties = [
 
     'provider',
     'principal_investigator',
-    'embargo_date',	
+    'embargo_date',
 ];
 
 const excludeProperties = (properties) => (object) => {

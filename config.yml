@@ -8,10 +8,11 @@ domain:
 #   auth:
 #     user: testAccount.user # generated ethereal user
 #     pass: testAccount.pass # generated ethereal password
-db: 
+db:
+  rebuild: true
   dialect: mysql
   username: root
-  password: ''
+  password: rootingforyou
   database: intake
   host: localhost # for some reason, no port required - there exists a default?
 port: 3000

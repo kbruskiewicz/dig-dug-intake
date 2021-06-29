@@ -1,9 +1,10 @@
 const model = require('./modelUtils');
 const fetch = require("node-fetch");
+const old_data = require('../data/old_data');
 
 function assert(condition, message) {
     if (!condition) {
-      throw new Error(message || "Assertion failed");
+        throw new Error(message || "Assertion failed");
     }
 }
 
@@ -22,7 +23,7 @@ const schemaCheck = (properties) => (object) => {
     // * schemaCheck(['name', 'source', 'workflow', 'status', 'location'])({ name, source, workflow, status, location });                   // PASS
     // * schemaCheck(['name', 'source', 'workflow', 'status', 'location'])({ name, source, workflow, status, location, embargo_date });     // PASS (redundant properties are allowed)
     // * schemaCheck(['name', 'source', 'workflow', 'status', 'location'])({ name, source });                                               // FAIL (all given properties are necessary)
-    
+
     // Combine with keys of schema objects to make a schema-checking function (upto the property existence, excluding value types)
     // Useful for adapters/translating functions:
     // const isDatasetEntry = schemaCheck(Object.keys(model.schemas.datasetSchema));
@@ -32,31 +33,83 @@ const schemaCheck = (properties) => (object) => {
 
     try {
         properties.forEach(property => {
-            assert(object.hasOwnProperty(property), `Object does not have property ${property}, object: ${object}`)
+            assert(object.hasOwnProperty(property), `schemaCheck: Object does not have property ${property}, object: ${object.toString()}`)
         });
         return object;
-    } catch(error) {
+    } catch (error) {
         console.error(error);
         return null;
     }
 }
 
-// const isDatasetEntry = schemaCheck(Object.keys(model.schemas.datasetSchema))
-const isDatasetEntry = schemaCheck(['name', 'source', 'workflow', 'status', 'location', 'datatype', 'organization', 'description']);
+const adapt = reshaper => objects => objects.map(reshaper);
+const filterEntries = filter => entries => entries.filter(entry => {
+    if (!!filter.where) {
+        return Object.entries(filter.where).every(filterEntry => {
+            const [key, value] = filterEntry;
+            return entry[key] === value;
+        })
+    } else {
+        console.warn("the filter given to the adapter doesn't have a `where` clause")
+        return entries;
+    }
+});
 
+// const isDatasetEntry = schemaCheck(Object.keys(model.schemas.datasetSchema))
+const isDatasetEntry = schemaCheck([
+    'name',
+    'source',
+    'workflow',
+    'status',
+    'location',
+    'datatype',
+    'organization',
+    'description'
+]);
+
+const oldDataAdapter = filter => new Promise(res => res(adapt(el => isDatasetEntry({
+    name: el['Dataset Name'],
+    portal: el.portal,
+    principal_investigator: el['PI/Contact'],
+    status: el['Status'],
+    description: el['Notes'],
+    location: el['Location'],
+    source: '',
+    workflow: '',
+    datatype: '',
+    organization: '',
+    // 'Dataset Name': 'Late-onset Alzheimer’s (PMID: 30820047)',
+    // 'PI/Contact': 'Kunkle',
+    // 'Summary/Individual level ': 'Summary',
+    // 'Need / Urgency': '',
+    // Notes: 'PMID: 30820047'
+}))((function() {
+    new_data = [];
+    console.log(old_data.data)
+    Object.entries(old_data.data).forEach(el => {
+        const [portal, schemas] = el;
+        console.log([portal, schemas])
+        schemas.datasets.forEach(datasetEntry => {
+            console.log(datasetEntry)
+            new_data.push({
+                portal,
+                ...datasetEntry
+            })
+        })
+    })
+    return new_data;
+})())))
 
 const dgaAnnotations = (filter) => fetch(
-    'http://www.diabetesepigenome.org:8080/getAnnotation', 
-    { 
-        method: "POST", 
-        body: JSON.stringify({ type: 'Annotation' }) 
-    })
+        'http://www.diabetesepigenome.org:8080/getAnnotation', {
+            method: "POST",
+            body: JSON.stringify({ type: 'Annotation' })
+        })
     .then(result => result.json())
     .then((responseBody) => {
+
         // TODO: Json Query
         const parsedResponse = Object.entries(responseBody)[0][1];
-
-        const adapt = reshaper => objects => objects.map(reshaper);
 
         // TODO: it should be feasible to turn this into a spec driven construct?
         /*
@@ -110,29 +163,24 @@ const dgaAnnotations = (filter) => fetch(
         // translation function
         const datasetEntries = adapt(o => isDatasetEntry({
             accession_id: o.annotation_id,
-            name: `${o.portal_tissue_id}`,
+            description: `${o.portal_tissue_id}`,
             organization: 'DGA',
-            description: `${o.portal_tissue}`,
+            name: `${o.portal_tissue}`,
             source: o.annotation_source,
-            workflow: `${o.underlying_assay}`,   // TODO: array value? turn into string
-            status: o.dataset_status,       // TODO: map into our own status codes for dataset status?
+            workflow: `${o.underlying_assay}`, // TODO: array value? turn into string
+            status: o.dataset_status, // TODO: map into our own status codes for dataset status?
             datatype: 'annotation',
-            location: `diabetesgenome.org`,                // TODO: how to link into DGA resource to see the result?
+            location: `diabetesgenome.org`, // TODO: how to link into DGA resource to see the result?
             principal_investigator: o.lab,
             visible: 1 // truthy, if we're seeing it here we're supposed to see it because the datasource is public
-        }))(parsedResponse);  
+        }))(parsedResponse);
 
         return datasetEntries;
 
-    }).then(entries => entries.filter(entry => {
-        // console.log(filter)
-        return Object.entries(filter.where).every(filterEntry => {
-            const [key, value] = filterEntry;
-            return entry[key] === value;
-        })
-    }))
+    }).then(filterEntries(filter))
 
 module.exports = {
+    oldDataAdapter,
     dgaAnnotations,
     isDatasetEntry,
 }
